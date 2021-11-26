@@ -1,0 +1,696 @@
+== The Formal Programming Paradigm
+label = chapter-programming_model
+
+To precisely describe the :{cvtr} programming paradigm, this chapter introduces a core calculus of :{rescala} called :{fr} that formalizes the syntax and semantics introduced in :ref{Chapter; chapter-demonstration}.
+While :{rescala} is older than :{fr} the current implementation of :{rescala} was co-developed together with :{fr}.
+:ref{Chapter; chapter-project} discusses how the calculus is extended into the full implementation of :{rescala}.
+However, the model is designed to be independent of any concrete embedding language.
+:ref{Chapter; chapter-formalization} formally states the assumptions on the embedding language and proves the resulting properties of the model.
+
+
+
+# Syntax
+
+::figure{label=fig:semantics:syntax}
+  ``{converter=tex; template=/templates/formalism.scim}
+    \begin{document}
+    \begin{alignat*}{2}
+    C ::= &\  (M; D | ... | D) &\mathit{Communication}\\
+    D ::= &\  \device{L}{Σ}   &\mathit{Device} \\
+    L ::= &\  \instore{t}{μ} \mid \instore{t}{μ} \tprop{A}{P}   &\mathit{Process}\\
+    v ::= &\  \fun{x}{t} \mid r \mid \unit \mid …  &\mathit{Value}\\
+    t ::=
+    &\ v \mid x \mid t\ t\mid   &\lambda\ \mathit{Term}\\
+    &\ r \mid{} \react{\overline{t}}{f} \mid \fold{t}{t}{f}  \mid \flatten{t} \mid \filter{t}{f} \mid &\mathit{Reactive} \\
+    & \evt{s} \mid \observe{t}{o} ∣ \access{t} \mid \fire{t}{t} &\mathit{Integration}
+    \end{alignat*}
+    \begin{alignat*}{2}
+    r & &\mathit{Reactives\ (locations)}
+    \\
+    s & &\mathit{Source\ definition}
+    \\
+    o & &\mathit{Observer\ definition}
+    \\
+    f &: (μ, \overline{r}) → v  &\mathit{User\textnormal{-}defined\ function}
+    \\
+    M &: r ↦ ((v × v) → v) &\mathit{Merge\ mapping}
+    \\
+    Σ &: r ↦ v   &\mathit{Snapshot}
+    \\
+    μ &: r ↦ (\inp{} ⊂ r, \vala{} \in v, \op{} \in f, \act{} ∈ f, \obs{} ⊂ o)   &\mathit{Local\ store}
+    \end{alignat*}
+    \end{document}
+  ``
+  Syntax of :{fr}.
+::
+
+
+
+:ref{Figure; fig:semantics:syntax} shows the syntax of :{fr}.
+The outermost term is a set of communicating devices :math{"(M; D_1 | ... | D_n)"} consisting of
+a mapping :math{M} that assigns each replicated reactive :math{r} a merge function :math{r ↦ merge_r} to model CRDTs,
+and a set of devices :math{D_1 | ... | D_n} executing concurrently.
+Confer to :ref{Section; sec-paxos_as_crdt} for a discussion how protocols other than classical CRDTs may be expressed using merge functions.
+Devices :math{D} have volatile state in the form of processes :math{L}, and durable state in the form of snapshots :math{Σ} – corresponding to a simplified view of RAM and disk storage.
+The current process is lost when the device crashes, but the snapshot is persisted.
+Each :math{D_i} starts with an initial process :math{L_i} and an empty snapshot.
+
+::figure{label=figure-model-evaluation_context}
+  ``{converter=tex; template=/templates/formalism.scim}
+    \begin{document}
+    \begin{alignat*}{2}
+    E ::=
+    &\mid [\cdot] \mid E\ t \mid v\ E \\
+    &\mid{} \react{(\overline{r}, E, \overline{t})}{f} \mid \fold{E}{t}{f} \mid \fold{r}{E}{f} \mid \filter{E}{f} \mid \flatten{E} \\
+    &\mid \evt{E} \mid \observe{E}{o} \mid \access{E} \mid \fire{E}{t} \mid \fire{r}{E}
+    \end{alignat*}
+    \end{document}
+  ``
+  Evaluation context.
+::
+
+The evaluation of processes :math{L} models
+either (a) the execution of application code :math{"\instore{t}{μ}"} with term :math{t} and store :math{μ}
+or (b) the propagation of changes during a transaction :math{"\instore{t}{μ} \tprop{A}{P}"}.
+The propagation :math{"\tprop{A}{P}"} contains the sets of active reactives :math{A} and processed reactives :math{P} and is used by the runtime for bookkeeping during transactions.
+The evaluation of processes uses the :math{\lambda}-calculus as the embedding language.
+Values :math{v} include functions :math{"\fun{x}{t}"}, the :math{\unit} value, and reactives :math{r}.
+Terms :math{t} include function definitions and application, creating new reactives, and integrations of reactive and external code.
+In :{fr} all terms creating new reactives are capitalized.
+Reactives that are used as inputs or for activation are left of a dot,
+and user-defined functions for reevaluation are in braces.
+For the calculus, we assume an arbitrary set of user-defined functions :math{f} to exists.
+Note that user-defined functions are functions on the meta-level and are not to be confused with functions (:math{"\fun{x}{t}"}) inside the calculus.
+In a typical implementation such as :{rescala}, the set of user-defined functions will be the side-effect-free subset of functions from the host language.
+
+We use a standard, left to right, call by value,
+evaluation context :math{E} :cite{Felleisen:1992:RRS:136293.136297} shown in :ref{Figure; figure-model-evaluation_context}.
+The store :math{μ} maps reactives :math{r} to a 5-tuple with named values containing
+the set of input reactives (:math{"\inp{} ⊂ r"}),
+the current value (:math{"\vala{} \in v"}),
+the function used for computing new values during reevaluation (:math{"\op{} \in f"}),
+the function to compute if a reactive activates after reevaluation (:math{"\act{} ∈ f"}),
+and any observer definitions triggered by the reactive (:math{"\obs{} ⊂ o"}).
+:% and the function to reset the value of a reactive at the end of a transaction (:math{"\rst{} ∈ f"}).
+We write :math{"μ(r).\vala{}"} to access the value :math{"\vala{}"} of reactive :math{r} in store :math{μ}.
+
+
+# Types
+
+
+::figure{label=fig:typing-rules; aliases=rule-Map,rule-Fold,rule-Flatten,rule-Choice,rule-Filter,rule-Source,rule-Observe}
+  ``{converter=tex; template=/templates/formalism.scim}
+    \begin{document}
+    \begin{mathpar}
+    \infer[Map]
+    {t_i : \type{Reactive[T_i]} \and f : \type{\overline{T} → R}}
+    {\react{\overline{t}}{f} : \type{Reactive[R]}}
+    \and
+    \infer[Fold]
+    {t : \type{Reactive[T]} \and t_0 : \type{R} \and f : \type{(R, T) → R}}
+    {\fold{t}{t_0}{f} : \type{Reactive[R]}}
+    \and
+    \infer[Flatten]
+    {t : \type{Reactive[Reactive[T]]}}
+    {\flatten{t} : \type{Reactive[T]}}
+    \and
+    % \infer[Choice]
+    % {t_1 : \type{Reactive[T]} \and t_2 : \type{Reactive[T]} }
+    % {\ror{t_1}{t_2} : \type{Reactive[T]}}
+    % \and
+    \infer[Filter]
+    {t : \type{Reactive[T]} \and f : \type{T → Boolean}}
+    {\filter{t}{f} : \type{Reactive[T]}}
+    \and
+    \infer[Source]
+    {s : \type{SourceDef[T]}}
+    {\evt{s} : \type{Reactive[T]}}
+    \and
+    \infer[Observe]
+    {t : \type{Reactive[T]} \and o : \type{ObserverDef[T]}}
+    {\observe{t}{o} : \type{Observer}}
+    \end{mathpar}
+    \end{document}
+
+  ``
+  Typing rules of reactives.
+::
+
+
+:ref{Figure; fig:typing-rules} shows the typing rules of reactives.
+We use the types to give an intuition how syntactic elements in :{fr} are correctly combined, and how an implementation would embed and express the methods of :{fr} into the embedding language.
+In general, any language with a type system supporting generics should allow for type-safe embedding of :{fr}.
+To simplify our presentation, we do not show the typing context for variables.
+All reactives are of type :math{"\type{Reactive[T]}"} and are parametric over the value they carry.
+A :math{"\type{Reactive[T]}"} corresponds to a signal carrying a value of type :math{"\type{T}"}, where an event of type :math{"\type{T}"} would be represented by a :math{"\type{Reactive[Option[T]]}"}.
+Many of the methods to create reactives allow for a user-defined function :math{f} to specialize the behavior of the created reactive.
+The type system ensures that the type of functions is compatible with the value type of reactives the function operates on.
+However, note that our type system for user-defined functions is specialized to include them in the :{flowgraph}.
+That is, in the dynamic semantics (:ref{Section; sec:semantics:reactive-language-overview}) each user-defined function operates on the current store and the input reactives.
+For example, a user-defined function :math{f} of type :math{"f: \type{A → B}"} takes a store :math{μ} and a reactive :math{"r: \type{Reactive[R]}"} as its parameter and returns a value of type :math{"\type{B}"}.
+
+
+• :rule{Map} has matching types for the :math{i}-th input reactive :math{t_i} and the :math{i}-th parameter :math{T_i} of the given function :math{f}.
+The function is applied to the values of the inputs.
+• :rule{Fold} uses :math{t_0} as an initial value which is passed to the user-defined function :math{f}.
+The type of :math{f} matches the initial value and the value of the input.
+The result type of the function has the same type as the initial state.
+• :rule{Flatten} removes one level of nesting, by extracting the value of the nested reactive.
+:% • :rule{Choice} states that :code{||} takes two inputs :math{t_1} and :math{t_2} which must be of the same type, and the result is also of that same type.
+:% It returns the value of its left operand :math{x_1} if :math{x_1} triggers, otherwise the right operand :math{x_2} if :math{x_2} triggers.
+• :rule{Filter} has the same type, :math{"\type{Reactive[T]}"}, as its single input :math{t}.
+The function :math{f} must take a parameter of the type :math{"\type{T}"} and return a :math{"\type{Boolean}"}.
+A filter reactives propagates the value of the input unchanged, if the filter condition :math{f(x)} is true.
+• A :emph{source reactive} is of type :math{"\type{Reactive[T]}"}, given that it is triggered by a source :math{s} of type :math{"\type{SourceDef[T]}"}, i.e., the inner type :math{"\type{T}"} of the reactive is defined by the inner type of :math{s} (rule :rule{Source}).
+Sources are how we model data arriving from somewhere outside the calculus.
+• Similarly, an :emph{observe reactive} has a single input :math{t} of type :math{"\type{Reactive[T]}"}, given that they observe an :math{o} of type :math{"\type{ObserveDef[T]}"}, i.e., the inner type of the input reactive must match the type that is consumed by :math{o} (rule :rule{Observe}).
+Observers model how data is extracted from the calculus and passed to some external system.
+
+
+
+::figure{label=fig:auxiliary-functions}
+  ``{converter=tex; template=/templates/formalism.scim}
+    \begin{document}
+    \begin{align*}
+    lookup(r, Σ, v) &= \begin{cases}
+    Σ(r) & r \in Σ \\
+    v & r \not\in Σ \\
+    \end{cases}
+    \\
+    \readyp{P}{μ} &= \{r \in μ ∣ r\not\in P \wedge \inputs{r, μ} \subseteq P \cup \{r\}\}
+    \\
+    \outdatedp{A, μ} &= \{r \in μ ∣ A  ∩ \inputs{r, μ} ≠ ∅ \}
+    \\
+    \reevexp{r, μ} &= μ(r).op(μ, \inputs{r, μ})
+    \\
+    \filterexp{r, μ} &= μ(r).\act(μ, \inputs{r, μ})
+    \\
+    \massign{μ}{r}{v} &= (μ, r ↦ (μ(r).\inp{}, v, μ(r).\op{}, μ(r).\act{}, μ(r).\obs{}))
+    \\
+    \inputs{r, μ} &= \begin{cases}
+    \{r₀, μ(r₀).\vala{}\} & μ(r).in = dynamic(r₀) \\
+    μ(r).in & \text{otherwise}\\
+    \end{cases}
+    \\
+    \stateful{r, μ} &= (r \in μ(r).in ∨ μ(r).in = ∅)
+    \\
+    \mathit{flatten}(μ, r) &= μ(μ(r).\vala).\vala
+    \\
+    \locationp{μ} &= \text{fresh location in $μ$, consistent between restarts}
+    \\
+    \extsourcesp{r} &= \text{source r is triggered externally}
+    \\
+    \extobservep{A, μ} &= \text{execute all external observers $\{o ∈ μ(r).\obs{} ∣ r ∈ A\}$}
+    \end{align*}
+    \end{document}
+  ``
+  Auxiliary functions for the operational semantics.
+::
+
+# Semantics Overview
+
+
+We define a small step operational semantics for :{fr}.
+:ref{Figure; fig:auxiliary-functions} contains auxiliary functions used throughout the semantics.
+Small step semantics allows modeling of message receives and crashes
+to nondeterministically occur between any two steps of a device.
+We first look at the stepping rules for individual devices (:ref{Section; sec:semantics:devices-and-snapshots}).
+Evaluation of a single device depends on the current process, and is separated into two differently labeled stepping relations, :math{→_D} and :math{→_p}, for presentation purposes.
+When evaluating application code (:math{→_D \subset D × D}) the :{flowgraph} is created (:ref{Section; sec:semantics:reactive-language-overview}) and actions are received.
+An action starts a propagation (:math{→_p \subset D × D}) (:ref{Section; sec:semantics:runtime-processing-propagation}).
+Propagation processes all reactives before execution of the application continues.
+A crash of the device during a propagation causes the triggering action to be lost.
+We extend the system to several communicating devices in :ref{Section; sec:semantics:distribution}.
+
+Communication has its own stepping relation (:math{→_C \subset C × C}),
+which nondeterministically chooses to further evaluate one of the devices, to send messages, or to receive messages.
+We make the usual fairness assumptions that eventually all devices get the chance to evaluate and communicate.
+
+
+
+::figure{label=fig:formalization:devices; aliases=rule-firetx,rule-commit,rule-access,rule-outer,rule-context}
+  ``{converter=tex; template=/templates/formalism.scim}
+    \begin{document}
+    \raggedright
+    $\boxed{→_D \subset D × D}$
+    \vspace{-5mm}
+    \begin{mathpar}
+    \infer{ μ(r).in = ∅}
+      {\ndevice{Σ}{μ}{\fire{r}{v}}  →_D
+       \devprop{Σ}{ \massign{μ}{r}{v} }{r}{ \{r\} }{ \{r\} }   } \named{firetx}
+    %
+    \infer{P = \dom{μ} \and \extobservep{A, μ} \\\\ Σ' = Σ, {\{
+    r ↦ μ(r).\vala{}
+    \mid r \in A ∧ \stateful{μ, r}\}}}
+    { \device{ \crp{}{μ}{{\prop{A}{P}}} }{{Σ}} →_D \device{ \crp{}{μ}{} }{{Σ'}} }
+    \named{commit}
+    %
+    \infer{ {v = μ(r).\vala{}} }
+      {\device{\crp{{\access{r}}}{μ}{}}{Σ} →_D \device{\crp{{v}}{μ}{}}{Σ} } \named{access}
+    %
+    \infer{{t →_\lambda t'}}{\device{\crp{{t}}{μ}{}}{} →_D  \device{\crp{{t'}}{μ}{}}{}} \named{outer}
+    %
+    \infer{\device{\rp{{t}}{{μ}}{}}{} →_D  \device{\rp{{t'}}{{μ'}}{}}{}}
+          {\device{\rp{{E[t]}}{{μ}}{}}{} →_D  \device{\rp{{E[t']}}{{μ'}}{}}{}} \named{context}
+    \end{mathpar}
+    \end{document}
+  ``
+  Operational semantics for process behavior of devices.
+::
+
+
+# Devices
+label = sec:semantics:devices-and-snapshots
+
+A device :math{"D = \device{L}{Σ}"} consists of a currently executing process :math{L}, and a snapshot :math{Σ}.
+A snapshot :math{Σ} is a mapping :math{(r ↦ v)} from reactives to their value.
+:ref{Figure; fig:formalization:devices} shows the device evaluation relation except creating reactives.
+
+Processes have two syntactic forms – one for the embedding application code and one for executing transactions in the :{flowgraph}:
+(1) :math{"\instore{t}{μ}"} executes the application code :math{t} with store :math{μ} to create and modify the :{flowgraph},
+and (2) :math{"\instore{t}{μ}\tprop{A}{P}"} executes the runtime propagation of changes during a transaction,
+where :math{"\instore{t}{μ}"} is the application level code to continue with after the update,
+and :math{"\prop{A}{P}"} contains the state of the runtime update propagation.
+The :rule{firetx} rule (and other :rule{*tx} rules we see later) switch from the embedding application to the transaction and the :rule{commit} ends the transaction and switches back.
+
+The :rule{firetx} rule evaluates the term :math{"\fire{r}{v}"} to create a new transaction on source :math{r} with value :math{v} and activates :math{r},
+i.e., marks it as having changed.
+The precondition ensures that :math{r} has no inputs, i.e., it is a source.
+The device switches to propagation by adding the runtime state :math{"\prop{\{r\}}{\{r\}}"},
+which is read as :math{r} is :emph{active} (it has changed its values) and :math{r} was :emph{processed} (it will not change anymore in the current propagation).
+Section :ref{sec:semantics:runtime-processing-propagation} explains how these sets are used for propagation.
+The current term of the process :math{"\fire{r}{v}"} evaluates to just :math{r},
+indicating that firing a source produces no new value.
+Finally, the value of the state :math{μ(r)} is changed to :math{v} – we write :math{"\massign{μ}{r}{v}"} to represent the updated store (c.f. :ref{Figure; fig:auxiliary-functions}).
+
+:rule{firetx} could be extended to change multiple reactives at the same time, and :{rescala} supports such transactions.
+However, changing multiple reactives in the same transaction can also be modeled by deriving all of them from a common source, which is the only form supported in the calculus.
+
+
+The :rule{commit} rule ends the propagation and updates the snapshot to include all changes.
+When a propagation ends, the set of processed reactives :math{P} contains all reactives in the domain of :math{μ}.
+The :rule{commit} rule steps from a propagation that processed all reactives back to normal application execution
+by keeping the term and store :math{"\instore{t_l}{μ}"} from the propagation
+and producing a new snapshot :math{Σ'}, which reflects the changes to folds
+and sources  :math{A} that were active in the propagation.
+We write :math{Σ' = (Σ, r ↦ v)} to say that :math{Σ'} contains the same value assignments as :math{Σ},
+except for :math{r} which is updated to :math{v}.
+The premise of :rule{commit} asserts that :math{Σ'} is updated to contain
+the current values of all active sources and folds :math{r \in A}.
+Sources and folds are computed by inspection of the inputs :math{μ(r).in},
+sources have no inputs, and folds have themselves as an input.
+The :rule{commit} rule also executes the observers of all active reactives using :math{"\extobservep{A, μ}"}.
+Similar to sources, the effect of observers is not specified in the calculus but repersents an abstract integration with an external system.
+
+The :rule{access} rule evaluates the term to the current value of the reactive,
+without modifying the store or the snapshot.
+Note that :math{"\access{r}"} in :{fr} is not to be confused with the :code{.value} method in :{rescala}.
+The version in :{fr} is for accessing the value of reactives from outside a transaction, while in :{rescala} it is used only inside signal expressions.
+
+The :rule{outer} rule embeds the stepping relation of the :math{\lambda}-calculus outside reactive operators.
+The rules of the :math{lambda}-calculus are not shown but are standard call-by-value rules using substitution.
+
+
+
+
+
+The :rule{context} rule evaluates nested device terms using a standard left-to-right evaluation context shown in :ref{Figure; figure-model-evaluation_context}.
+
+
+
+
+
+# Creating and Restoring the :{FlowGraph}
+label = sec:semantics:reactive-language-overview
+
+
+::figure{label=fig:formalization:creating-reactives; aliases=rule-source,rule-map,rule-fold,rule-flatten,rule-filter,rule-observe}
+  ``figure{converter=tex; template=/templates/formalism.scim}
+    \begin{document}
+    \raggedright
+    $\boxed{→_D \subset D × D}$
+    \vspace{-3mm}
+    \begin{mathpar}
+    \infer{\makeloc{r₀}{μ} \\ {v_s = lookup(r₀, Σ, v)}
+    \\\\ μ' = μ, r₀ ↦ (∅, {v_s}, \unit{}, ∅, \sigact{}) }
+    { \ndevice{Σ}{μ}{ \evt{v} } →_D   \ndevice{(Σ, {r₀ ↦ v_s})}{μ'}{r} }
+    \named{source}
+    %
+    \infer{\makeloc{r₀}{μ}
+    \\ μ' = μ, {r₀ ↦ (\{\overline{r}\}, f(μ, \overline{r}), f, ∅, \sigact{})}  }
+    {\ndevice{Σ}{μ}{\react{\overline{r}}{f}} →_D    \devprop{Σ}{μ'}{r₀}{\{r₀\}}{\{r₀\}}  }
+    \named{map}
+    %
+    \infer{\makeloc{r₀}{μ} \\ {v_s = lookup(r₀, Σ, v)}
+    \\\\ μ' = μ, r₀ ↦ (\{r₀, r₁\}, {v_s}, f, ∅, \sigact{}) }
+    { \ndevice{Σ}{μ}{\fold{r₁}{v}{f}}  →_D   \ndevice{(Σ, r₀ ↦ v_s)}{μ'}{r₀} }
+    \named{fold}
+    %
+    \infer{\makeloc{r}{μ}
+    \\\\ μ' = (μ, r₀ ↦ (\dynamic{r₁}, \mathit{flatten}(μ, r₁), \mathit{flatten}, ∅, \sigact{}))}
+    {\ndevice{Σ}{μ}{\flatten{r₁}}  →_D   \ndevice{Σ}{μ'}{r₀} }
+    \named{flatten}
+    %
+    \infer{\makeloc{r₀}{μ}
+    \\ μ' = μ, {r₀ ↦ (\{r₁\}, μ({r₁}).\vala{}, \mathit{identity}, ∅, f)}  }
+    {\ndevice{Σ}{μ}{\filter{r₁}{f}} →_D    \ndevice{Σ}{μ'}{r₀}  }
+    \named{filter}
+    %
+    \infer{\makeloc{r₀}{μ}
+    \\ μ' = μ, {r₀ ↦ (\{r₁\}, μ({r₁}).\vala{}, \mathit{identity}, \{o\}, \sigact{})}  }
+    {\ndevice{Σ}{μ}{\observe{r₁}{o}} →_D    \ndevice{Σ}{μ'}{unit}  }
+    \named{observe}
+    \end{mathpar}
+    \end{document}
+  ``
+  Operational semantics for creating reactives.
+::
+
+The reduction rules in :ref{Figure; fig:formalization:creating-reactives}
+are concerned with creating the :{flowgraph}.
+A reactive :math{r} is either a source without inputs, or is derived from its input reactives :math{"\overline{x}"}.
+The :rule{source}, :rule{map}, :rule{fold}, :rule{flatten}, and :rule{filter} rules each create a fresh identifier :math{"\makeloc{r}{μ}"}
+and add the inputs, value, operator functions, observer functions, and activation functions :math{"r  ↦ (\inp{}, \vala{}, \op{}, \obs{}, \act{})"}
+to the store :math{μ}.
+Restoration from a snapshot happens during the creation of sources and folds by loading the initial value from the snapshot if present.
+
+Creating reactives always follows the same basic process.
+First, a new location is found to store the reactive.
+Then that location is initialized with the correct state depending on the method used to create the reactive.
+The state always includes the inputs and an initial value and in most cases a user-defined function for updating the value of the reactive.
+Most reactives have no observers and use :math{"\sigact{}"} to compute their own activation resulting in those reactives to always activate when any of their inputs activate.
+The user-defined functions :math{f} used in many of the reactives are assumed to take a store :math{μ} and the input reactives as parameters.
+In :{rescala} the signal expression macro converts a Scala expression to such a function, in :{fr} we just assume this to happen.
+Finally, the expression evaluates to the new store location.
+
+The :rule{source} rule creates a reactive :math{r₀} with initial value :math{v_s} and no update functions.
+If the snapshot contains :math{r₀},
+then the value is restored from the snapshot, i.e., :math{"v_s = Σ(r)"}.
+If the snapshot does not contain :math{r₀}, then the given value is used, i.e., :math{"v_s = v"}.
+
+The :rule{map} rule derives a new reactive from its inputs :math{"\overline{r}"} using a user-defined function :math{f}.
+Map reactives compute their current value by applying :math{f} to the current value of their inputs.
+The process is the same for computing the initial value, where :math{f} is directly applied.
+Map reactives have no observer and they always activate if any of their inputs activates, thus the activation function is :math{"\sigact{}"}.
+Map reactives are neither stored nor restored from the snapshots.
+Instead, the function :math{f} is applied to the restored values of :math{"\overline{r}"} to compute the restored value.
+
+The :rule{fold} rule creates a reactive :math{r₀} with user-defined function :math{f}.
+To model access of its state during reevaluation fold reactives have themselves as an input in addition to :math{"\overline{r}"}, thus passing the current value to the user-defined function :math{f}.
+The initial value :math{v_s} is restored in the same way as in the :rule{source} rule.
+
+
+The :rule{flatten} rule creates reactives which derive their value from a single input reactive :math{r₁}.
+The function :math{"\mathit{flatten}(μ_f, r_f) = μ_f(μ_f(r_f).\vala).\vala"} describes the indirection flatten creates.
+That is, the value of flatten is the value of the nested reactive.
+Like map reactives, flatten does not directly restore its values,
+but all inputs of flatten are assumed to be restored before the flatten reactive is created.
+Flatten reactives have a specially labeled input :math{"\dynamic{r₁}"}, instead of just :math{r₁},
+to support dynamic detection of dependencies during propagation as described in :ref{Section; sec:semantics:runtime-processing-propagation}.
+
+The :rule{filter} rule is the only rule that defines an activation function :math{f} to limit which values are propagated.
+The value of filter reactives is the value of their input.
+
+Finally :rule{observe} creates a new reactive that stores an observer.
+The value of observer reactives is also always the value of its input.
+The store location of observe reactives is not returned to the embedding application, thus there cannot be other reactives derived from observers.
+
+Each of fold, flatten, filter, and observe require their own support from the calculus.
+Fold requires reactives to have themselves as inputs.
+Flatten requires dynamic inputs.
+Filter requires activation functions.
+Observe requires executing effects.
+Removing any combination of those four from the calculus still provides a useful subset of functionality.
+For example, removing filter essentially removes event semantics, removing fold results in stateless applications (except sources), and removing flatten makes :{flowgraph}s static.
+
+::figure{label=fig:dataflow-graph-formalism-example}
+  ``image{converter=tex; template=/templates/formalism.scim}
+    \newcommand{\storeex}[3]{(\{#1\}, \texttt{\small#2}, \texttt{\small#3}, ∅, true)}
+    \newcommand{\sourceex}[1]{(∅, \texttt{\small#1}, \unit, ∅, true)}
+    \begin{document}
+    \begin{alignat*}{2}
+    μ = &( \\
+    \locm{name} ↦&\  \sourceex{"some name"}, \\
+    \locm{text} ↦&\  \sourceex{"some message"}, \\
+    \locm{message} ↦&\  \{\locm{name}, \locm{text}\}, \texttt{"some name: some message"}, \\
+     \phantom{↦}&\  \texttt{(n, i) => n + ": " + i}, ∅, true), \\
+    \locm{room1} ↦&\  \storeex{\locm{room1}, \locm{message}}{Nil}{(history, msg) => msg :: history}, \\
+    \locm{room2} ↦&\  \sourceex{List(”Me: a constant message”)}, \\
+    \locm{roomList} ↦&\  \sourceex{(\locn{room1}, \locn{room2})}, \\
+    \locm{index} ↦&\  \sourceex{0}, \\
+    \locm{selectedRoom} ↦&\  \storeex{\locm{roomList}, \locm{index}}{\locn{room1}}{(l, n) => l(n)}, \\
+    \locm{roomContent} ↦&\  \storeex{\dynamic{\locm{selectedRoom}}}{Nil}{unit} \\
+    &)
+    \end{alignat*}
+    \end{document}
+  ``
+  :% ``
+  :%   val contentWidget = §\locn{roomContent}§.Map {content => listWidget (content)}
+  :%   displayUI(§\locn{name}§, §\locn{text}§, contentWidget)
+  :% ``
+
+  Example of the store after evaluating the chat example up to constructing the content widget.
+::
+
+
+We now have all constructs required to build a :{flowgraph} of an :{fr} application.
+:ref{Figure; fig:dataflow-graph-formalism-example} shows store :math{μ} (which encodes the :{flowgraph}) after evaluating up to :ref{Line; line:overview:full-code:; line=dataflow-evaluation-stop} of :ref{Figure; fig:overview:full-code-formalism-chat-example}.
+The application is structured in a way that each created reactive is assigned to a variable, and we have reuse these names to label the location of each reactive for better understanding.
+
+
+## Storing and Restoring Nested Reactives
+
+When a reactive :math{r₀} is included in a snapshot and contains a nested reactive :math{r} then :math{r} is also included in the snapshot.
+The value of :math{r₀} in the snapshot will then contain a reference to :math{r}.
+This process is recursive.
+
+During restoration of :math{r₀}, the values of any nested reactive :math{r} are also restored,
+if :math{r} has not yet been restored otherwise.
+However, the operator and inputs of the nested reactive :math{r} are unknown when :math{r₀} is being restored.
+Thus, we restore a placeholder reactive that is essentially constant.
+In the case that :math{r} is recreated later, the placeholder is replaced by the actual reactive transparently.
+We discuss in :ref{Section; section-case_study-todomvc} how the restoration of nested reactives is achieved in a practical implementation.
+
+
+
+
+# Propagation of Changes During Transactions
+label = sec:semantics:runtime-processing-propagation
+
+
+The rules for propagation and reevaluation :math{"\stp{r}"} of a reactive :math{r} are shown in :ref{Figure; fig:formalization:propagation}.
+We write just :math{→_p} if the specific reactive is irrelevant.
+Whenever a transaction changes the value of a reactive, then the runtime starts :emph{propagation} of that change
+and all transitively derived reactives must :emph{reevaluate},
+i.e., compute their new value based on the inputs and on the operator.
+Syntactically, processes that perform a propagation are written :math{"\instore{t}{μ} \tprop{A}{P}"}.
+With the state of the propagation expressed by the sets of active reactives :math{A} and processed reactives :math{P}.
+:math{→_p} evaluates devices with such processes.
+From the application developers’ point of view,
+all reevaluations happen at the same time (synchronously) and use the most up-to-date value of their inputs.
+:{fr} models propagation as a stepwise process to reason about failure cases
+but guarantees synchronous semantics.
+At the beginning of a propagation, the transaction has changed the value of a reactive :math{r},
+which is active :math{r \in A} and processed :math{r \in P}.
+During the propagation, ready reactives :math{"\ready{μ}{P}{r'}"}
+are either reevaluated or skipped, until all reactives are processed.
+
+
+::figure{label=fig:formalization:propagation; aliases=rule-skip,rule-reevaluate,rule-inner,rule-write}
+  ``image{converter=tex; template=/templates/formalism.scim}
+    \begin{document}
+    \raggedright
+    $\boxed{→_p \subset D × D}$
+    \vspace{-5mm}
+    \begin{mathpar}
+    \infer{{\ready{P}{μ}{r} \and \noutdated{A, μ}{r}}}
+    {\devprop{Σ}{μ}{t}{A}{P}  \stp{r} \devprop{Σ}{μ}{t}{A}{P,r} }
+    \named{skip}
+    %
+    \infer{ \ready{P}{μ}{r} \and \outdated{A, μ}{r} \and v = \reevexp{r, μ}
+    \\ A' = A, r \ \text{if} \ \filterexp{r, μ};\ A\ \text{otherwise} }
+    { \devprop{Σ}{μ}{t}{A}{P}  \stp{r} \devprop{Σ}{\massign{μ}{r}{v}}{t}{A'}{P,r} }
+    \named{reevaluate}
+    %
+    %\infer{{t →_\lambda t'}}
+    %{ \device{\crp{}{μ}{{t} \cdot r \cdot \prop{A}{P}}}{} \stp{r} \device{\crp{}{μ}{{t'} \cdot r \cdot \prop{A}{P}}}{} } \named{inner}
+    %
+    %\infer{ } { \device{\crp{}{μ}{{v \cdot r} \cdot \prop{A}{P}}}{}   \stp{r}   \device{\crp{}{\massign{μ}{r}{v}}{\prop{A}{P}}}{} } \named{write}
+    \end{mathpar}
+    \end{document}
+  ``
+  Operational semantics for propagation and reevaluation.
+::
+
+
+
+## Reevaluation
+A reevaluation (rule :rule{reevaluate}) is the process of computing the current value of a reactive :math{r} by evaluating :math{"\reevexp{r, μ}"} (:ref{Figure; fig:auxiliary-functions}).
+That expression applies the operator function :math{op} to the current store :math{μ} and the inputs of :math{r}.
+In case :math{r} is a flatten reactive the nested reactive :math{dynamic(r)} is treated as a normal input.
+
+
+## Propagation
+The :rule{firetx} rule (same for :rule{sourcetx} and :rule{synchronizetx} introduced later) writes a new value to the store :math{μ} and marks :math{r} as active and processed.
+A reactive :math{r} is ready (:math{"\ready{P}{μ}{r}"}) if it has not been processed and all inputs of :math{r} are processed.
+Fold reactives have themselves as inputs and are ready if all other inputs are processed.
+Flatten reactives are ready when the outer and the nested inputs are processed.
+Additionally, a reactive :math{r} is outdated (:math{"r \in \outdatedp{A, μ}"}),
+if any of its inputs are active, i.e., the input is reevaluated and the activation function of that input returns true.
+Depending on whether a ready reactive is outdated
+the :rule{skip} or :rule{reevaluate} rule is applied.
+The :rule{skip} rule marks a reactive as processed, if it is ready and not outdated.
+A skipped reactive is never active independent of its activation function.
+The :rule{reevaluate} rule additionally causes a reevaluation of the reactive
+and marks the reactive as active if the activation function returns true.
+In all cases, the reactive is marked as processed.
+When all reactives in the store have been processed the :rule{commit} rule (:ref{Figure; fig:formalization:devices}) ends the propagation.
+Because both sets, active reactives :math{A} and processed reactives :math{P}, only grow during a propagation, the process is guaranteed to terminate.
+
+
+
+::figure{label=fig:formalization:state-remote; aliases=rule-device,rule-synchronizetx,rule-sourcetx,rule-*tx}
+  ``image{converter=tex; template=/templates/formalism.scim}
+    \begin{document}
+    \raggedright
+    $\boxed{→_C \subset C × C}$
+    \vspace{-5mm}
+    \begin{mathpar}
+    \infer{{D_i →_D D_i'}}
+    {(M; D_1 | ... |{D_i}| ... | D_n)  →_C (M; D_1 | ... |{D_i'}| ... | D_n)  }
+    \named{device}
+    %
+    \infer{ v = \extsourcesp{r} \\
+    D' = \devprop{Σ}{ \massign{μ}{r}{v} }{t}{ \{r\} }{ \{r\} } }
+      {(M; D_1 | ... | \ndevice{Σ}{μ}{t} | ... | D_n) →_C
+       (M; D_1 | ... | D' | ... | D_n)   } \named{sourcetx}
+    %
+    \infer{
+      \overline{r} = \mathit{dom}(μ_s) ∩ \mathit{dom}(M)
+      \\ \mathit{merge}_i = M(r_i)
+      \\\\ v_i = \mathit{merge_i}(μ_s(r_i).\vala{}, μ_r(r_i).\vala{})
+      \\\\ D_s = \ndevice{Σ_s}{μ_s}{t_s} \\ D_r = \ndevice{Σ_r}{μ_r}{t_r}
+      \\ A = \{r_i ∣ μ_r(r_i).\vala{} ≠ v_i \}
+      \\\\ D_r' = \devprop{Σ_r}{\massign{μ_r}{r_i}{v_i}}{t_r}{A}{A}
+    }
+    {(M; D_1 | ... | D_s | ...| D_r  |... | D_n) →_C
+    (M; D_1 | ... | D_s | ...| D_r' |... | D_n)   }
+    \named{synchronizetx}
+    \end{mathpar}
+    \end{document}
+  ``
+  Operational semantics for remote updates.
+::
+
+
+# Communication Between Multiple Devices
+label = sec:semantics:distribution
+
+
+Communication is modeled by sending state between devices without ordering or reliability of messages.
+Thus, the guarantees of :{fr} apply to most existing systems.
+The stepping rules for communicating devices :math{"(M; D_1 | ... | D_n)"} are shown in :ref{Figure; fig:formalization:state-remote}.
+The merge functions in :math{M} define the global behavior of the replicated reactives
+and they are fixed before any device starts – no central coordination is required.
+
+
+The :rule{device} rule models any of the concurrent devices :math{D_i} taking a normal step in the device evaluation relation :math{→_D} (c.f., :ref{Section; sec:semantics:devices-and-snapshots}).
+This model allows for devices to execute at different speeds or pause execution for some time before resuming.
+
+The :rule{sourcetx} starts a new transaction when any of the sources are activated externally, e.g., by a user interaction.
+When exactly this is the case is defined by the :math{"\extsourcesp{}"} function which returns the new value for the source.
+In our calculus this function is underspecified, but is understood to represent an input from an external system.
+The started transaction is the same as in the :rule{firetx} rule.
+
+The :rule{synchronizetx} rule models all communication between devices, including delayed, duplicated, and dropped messages.
+Conceptually the rule selects two devices one device :math{D_s} that sends the values of all replicated reactives in its store :math{μ_s} and another device :math{D_r} that receives and merges those values and starts a new transaction.
+Neither :math{D_s} nor :math{D_r} have an ongoing transaction – synchronization may only happen when the :{flowgraph} of the application is idle.
+The rule always merges all replicated reactives :math{"\overline{r}"} of the sending device.
+The values of both replicas of each reactive are merged pairwise and the results are used as the new values for the store :math{μ_r} of the receiving device.
+If the receiving device does not have a value for a reactive, then merging returns the sent value.
+A new transaction is started on the receiving device with the changed replicated reactives :math{A} set as activating and processed.
+The transaction propagates the received changes to the local :{flowgraph}.
+
+:% Network communication failures are modeled as follows.
+Dropped messages and networks with only partial conenctions between devices are modeled by not executing :rule{synchronizetx} for a pair of devices.
+Delayed and reordered messages use artificial devices as an indirection.
+Artificial devices are normal devices as far as the calculus is concerned, but server no purpose in the model of the application and are only used to synchronize state.
+A delayed message from a device A to a device B, for example, is modeled by first synchronizing from A to an artificial device A'.
+Then at any later point, A' synchronizes with B.
+
+For consistency between devices,
+the merge function must form a semilattice (i.e., it is associative, commutative, and idempotent).
+Eventual consistency does require that all devices eventually do receive new messages for all reactives.
+
+
+
+
+
+## Sending Nested Reactives
+
+A replicated reactive :math{r₀} may contain other nested reactives :math{r} as values.
+When a device :math{D} adds :math{r} to the value of :math{r₀} for the first time, there are two cases to consider.
+
+First, if :math{r} is already a replicated reactive each device uses its local value of :math{r} inside :math{r₀}.
+The two reactives :math{r} and :math{r₀} are synchronized as any other two replicated reactives.
+Second, if :math{r} is not a replicated reactive, only the local device :math{d} can cause :math{r} to change.
+In this case, :math{d} promotes :math{r} to a replicated reactive by providing an initial value and a merge function.
+The merge function for :math{r} selects the latest value according to a logical timestamp.
+This latest-writer-wins scheme is race condition free, because the original device is the only writer of :math{r}.
+The current value of :math{r} is sent along the value of :math{r₀} when synchronizing,
+to allow remote devices to initialize a replica of :math{r}.
+Once initialized, :math{r} synchronizes independently of :math{r₀}.
+
+To simplify the presentation of the formalization we always assume the first case, i.e., that only replicated reactives are nested into other replicated reactives.
+We can do so without loss of generality by assuming that the transformation explained for the second case is applied implicitly.
+
+
+
+
+
+:% Below is the description of the basic lambda calculus, the evaluation context, and an extension for try/catch.
+:% None of those are very interesting, they have been removed from the paper for space reasons, and not updated since.
+
+:% # Basic Language with Errors.
+:% label = sec:semantics:operational-lambda-calculus-with-errors
+
+
+:% ::figure{label=fig:formalization:operational-lambda-calculus-with-errors}
+:%   ``{converter=tex; template=/templates/formalism.scim}
+:%     \begin{document}
+:%     \begin{mathpar}
+:%     \infer{ t →_\lambda t'}{ E[t] →_\lambda E[t'] } \named{context}
+:%     \infer{ }{(\fun{x}{t})\ v →_\lambda [x ↦ v]t } \named{app}
+:%     \infer{ }{ E[\error] →_\lambda \error } \named{error}
+:%     \infer{ }{ \handle{v}{t} →_\lambda v } \named{try}
+:%     \infer{ }{ \handle{\error}{t} →_\lambda t } \named{catch}
+:%     \infer{ t →_\lambda t' }{ \handle{t}{t_h} →_\lambda \handle{t'}{t_h} } \named{try/catch}
+:%     \end{mathpar}
+:%     \end{document}
+:%   ``
+:%   Operational semantics for the execution of inner functions.
+:% ::
+
+:% :ref{Figure; fig:formalization:operational-lambda-calculus-with-errors} shows the evaluation relation :math{→_\lambda}
+:% for the :math{\lambda}-calculus with errors.
+:% The :rule{error} rule evaluates errors in any context :math{E} to that error,
+:% aborting any other computation.
+:% The :rule{try}, :rule{catch}, and :rule{try/catch} rules allow specifying an error handler,
+:% which is executed depending on whether the tried expression evaluates to a value or an error.
+
+:% The evaluation of basic terms :math{→_\lambda} is embedded into the reactive language in two ways,
+:% (1) it is a subset of all possible evaluation steps and allows for normal computations while creating and modifying reactives,
+:% and (2) it is used for evaluation of operators when reactives are reevaluated,
+:% discussed in more detail in :ref{Section; sec:semantics:runtime-processing-propagation}.
+:% To enable using :math{→_\lambda} as a subset language (1),
+:% and allowing reactives to occur as values during reevaluation (2)
+:% :math{→_\lambda} operates on syntax including reactives,
+:% even though :math{→_\lambda} does not evaluate any reactive expressions.
+
+# Conclusion
+
+We have chosen an operational semantics to present :{fr} in this thesis because enables the reasoning about failures in the middle of execution.
+The calculus focuses on the core building blocks required to define a dynamic :{flowgraph}, but omits concrete concerns such as the distinction between signals and events, which are not necessary to reason about failure.
+:ref{Chapter; chapter-formalization} uses :{fr} as presented in this chapter to formally prove correctness.
+:ref{Chapter; chapter-project} then shows how :{rescala} implements :{fr} in a modular way, such that different semantics for reactives (such as signals and events) can be implemented.
+

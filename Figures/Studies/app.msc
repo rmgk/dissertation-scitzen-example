@@ -1,0 +1,18 @@
+msc {
+ hscale = "0.8",
+ arcgradient = 0;
+
+ u [label="Citizen A"], u2 [label="Citizen B"], s [label="Street light"], c [label="City"];
+
+ ...;
+ c=>s [label="News"];
+ s=>u [label="Forward"];
+ ...;
+ --- [label = "Emergency"];
+ |||;
+ c -x s [label="Disconnect"];
+ s=>u [label="Emergency!"];
+ s=>u2 [label="Emergency!"];
+ u=>u2 [label="News A"];
+ u2=>u [label="News B"];
+}

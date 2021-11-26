@@ -1,0 +1,26 @@
+\documentclass[preview, 11pt, class=memoir]{standalone}
+
+:{xetex fonts}
+
+% more advanced includes
+\usepackage{graphicx}
+
+% all the math formatting
+\usepackage{amsmath}
+
+\usepackage{amsthm}
+
+% multiple rows in tables, automatically included by lipics style
+\usepackage{multirow}
+
+% for inference rules
+\usepackage{mathpartir}
+
+% double brackets (llbracket rrbracket)
+\usepackage{ stmaryrd }
+
+:include{/templates/texcommands.scim}
+
+:{template content}
+
+

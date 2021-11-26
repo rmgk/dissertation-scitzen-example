@@ -1,0 +1,34 @@
+= A Programming Paradigm for Reliable Applications in a Decentralized Setting
+language    = en
+texTemplate = /templates/memoir.scim
+katexMacros = /templates/katex-macros
+author      = Ragnar Mogk
+pagestyle   = oneside
+
+:include{/Chapters/Preface.scim}
+
+:tableofcontents{}
+
+:include{/Chapters/Introduction.scim}
+
+:partition{The Paradigm and its Realization}
+
+:include{/Chapters/Demonstration.scim}
+:include{/Chapters/Resilient State.scim}
+:include{/Chapters/Programming Model.scim}
+:include{/Chapters/Formalism.scim}
+:include{/Chapters/Project.scim}
+
+:partition{Extensions, Experience, Evaluation}
+
+:include{/Chapters/Interlude.scim}
+:include{/Chapters/Errors and Exceptions.scim}
+:include{/Chapters/Compilation.scim}
+:include{/Chapters/Live.scim}
+:include{/Chapters/CRDTs.scim}
+:include{/Chapters/Case Studies.scim}
+:include{/Chapters/Experience.scim}
+:include{/Chapters/Performance Experiments.scim}
+
+:include{/Chapters/Related Work.scim}
+:include{/Chapters/Conclusion.scim}

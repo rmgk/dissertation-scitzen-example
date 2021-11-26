@@ -1,0 +1,51 @@
+# Actors
+label = section-related_work-actors
+
+The actor programming paradigm:cite{; DBLP:reference/parallel/KarmaniA11} is similar to object-oriented programming with strong encapsulation of internal state.
+The difference is that execution of messages (or methods) happens asynchronously in the actor paradigm.
+Asynchronous execution and encapsulation of state are what makes actors suited for concurrent and distributed systems:cite{; Miller2005} – a message in the programming paradigm has a direct representation as a message in the physical network and encapsulated state stays on the device hosting the actor.
+However, this also means that the actor paradigm does not protect developers from any of the issues of distributed systems, such as message reordering, lost messages, and partial crashes.
+In addition, the loose application structure implied by the actor paradigm makes automatic reasoning about the overall system consistency hard.
+Furthermore, we consider message-passing to be rather an implementation mechanism for enabling communication,
+but not a proper substitute for providing first-class composable and programmable abstractions as part of the programming paradigm.
+Despite the shortcomings of actors as a programming paradigm many implementations of actor languages provide extensions for fault tolerance.
+
+## Crash Tolerance
+
+Actor supervision mechanisms as
+provided by :cite{Akka; Akkadoc} and :cite{Erlang; Armstrong:2010:ERL:1810891.1810910}
+allow specifying user-defined handlers when an actor crashes (usually due to a programming error).
+The typical strategy to handle a single crashed actor is to replace it with a fresh instance of the actor and losing all state in the process.
+The scheme can be extended to also provide tolerance against device crashes by replacing all actors on a crashed device with new instances on another device.
+Restarting of actors works well for applications that require continued operation, such as telephony networks – for which actors were first designed.
+In a telephony network, it is cheap to reconnect a dropped call,
+and a missing part of the conversation can be tolerated, but it should always be possible to establish new calls.
+It is possible to use crash handlers to restore the state of an actor after restart.
+The :cite{Mnesia; Mattsson1998Mnesia} database provides a managed runtime for this purpose, but the details of state saving and restoration is completely left to the application logic.
+
+:cite{Orleans; Bernstein2014} provides the actor paradigm but with fully automatic deployment and life cycle management of actors.
+This allows Orleans to automatically restore the state of each actor after a crash.
+However, the state of each actor is stored independently without consistency guarantees between multiple actors,
+thus – in the presence of faults – it is difficult to reason about application properties that span more than a single actor.
+
+The cluster extension for Akka:cite{; AkkaCluster} provides similar restoration capabilities for individual actor state in cluster environments, still without overall system consistency.
+In addition, Akka cluster requires developers to modify the code of each actor that needs fault-tolerant state, making it impossible to reuse existing actors that are developed without support for fault tolerance.
+
+
+## Reliable Communication
+
+The cluster extension for Akka:cite{; AkkaCluster} also provides a library of CRDTs for data synchronization, but with barely any integration into the language.
+Thus, requiring applications to manually manage all communication and individually apply received changes to the local replica of a CRDT.
+
+:cite{AmbientTalk; VanCutsem2014} is an actor language specifically designed for mobile ad hoc networks.
+:cite{Direst; Myter2016} builds on top of AmbientTalk and adds reactive abstractions and
+automatic eventually consistent state replication.
+However, Direst uses a centralized replica to provide eventual consistency,
+hindering any communication between devices, when the centralized replica is not available.
+Furthermore, applications in Direst must statically declare their dependencies, because the network runtime relies on global knowledge of the flow of data between devices.
+
+Orleans has an extension called reactive caching:cite{; Burckhardt:2018:RCC:3288538.3276522} which adds a layer for push-based state for client devices.
+Essentially, whenever the state of an actor in the cluster changes, that state is preemptively send to interested devices outside the cluster (such as user interfaces running on a user’s device).
+This allows limited tolerance of intermittent networks, because local devices always only access their local replica.
+However, the device outside the cluster may not change any of the remote data.
+

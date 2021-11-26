@@ -1,0 +1,135 @@
+# Consistency and Data Types
+label = section-related_work-data_type_consistency
+
+The notion of consistency of data types is intimately linked to the notion of monotonicity.
+We regard consistency as a state in which certain information in a system no longer changes.
+For example, a consensus algorithm fixes a decision and will never provide a new answer for an old decision.
+On the other hand, new information can always be added to a consistent state – a monotonic increase of the available information.
+:cite{style=name; Hellerstein2019} show that all eventually consistent systems without central coordination must always be equivalent to a logically monotonic system.
+However, there are many approaches to consistency with their own trade-offs.
+We have limited ourselves to the use of state-based CRDTs with :{rescala}, but, as our formalization shows, we inherit the consistency guarantees of the data type used for replication.
+In this section, we discuss potential alternatives that may provide different advantages and are candidates to address the challenges of :{apps}.
+
+
+
+## The Global Sequence Protocol
+
+The :cite{Global Sequence Protocol (GSP); Burckhardt2015} provides a semantic foundation for eventual consistency using a central server connected to clients over an unreliable network.
+Clients have two separate states, a last known consistent state and their own local working state.
+Clients may always execute transactions on their own local state and immediately observe the effect.
+When the clients are connected to the central server, they send their local transactions to that server.
+The server decides a global order for transactions and replicates that order to all other clients.
+If the global order of transactions received from the server matches the local order of the client, then the local working state becomes the new consistent state.
+Otherwise, the local working state is discarded and the new consistent state is computed from the received transaction order.
+
+:cite{Global Operator Sequencing (GOS); Gotsman2017} generalizes the approach of the GSP to all systems that use an eventually consistent sequence of operations.
+We have discussed the idea of replicating the order of transactions instead of the state in :ref{Section; section-crdts-transactions-are-monotonic}.
+The generalization in GOS allows to prove the equivalence of GSP and certain weak memory models of CPUs, a direction that we have not yet explored in the context of :{cvtr}, but may be interesting when compiling to embedded devices.
+
+:cite{style=name; Bernstein:2017:GAS} use the GSP for synchronization of data between multiple Orleans clusters.
+This allows for geo-replication of data centers even if connections between them may sometimes be unreliable.
+GSP works well in this case, because connections are mostly fast and reliable, and GSP has little overhead in terms of the size of state for such cases.
+However, they did not extend their approach to client devices.
+
+:cite{Reactive Caching; Burckhardt:2018:RCC:3288538.3276522} introduces an eventually consistent layer for push-based state for clients connected to :cite{Orleans; Bernstein2014} clusters.
+The work includes a formalization with proofs of correctness.
+However, a severe limitation is that clients may only observe the state and never modify it locally.
+
+CloudTypes:cite{; Burckhardt2012} target client devices and are based on a predecessor of the GSP.
+They are designed as a drop in replacement for primitive data types that allow eventually consistent replication of primitive using a central server, thus their goal is also the implementation of :{apps}.
+However, CloudTypes are limited to implementation of the basic types that are provided, thus they are only suited for applications that do not require the synchronization of complex state.
+
+Overall, the GSP and related approaches have a diverse set of concrete implementations.
+We believe this is due to very different performance characteristics of the specific environments targeted at the time.
+CloudTypes was for mobile applications, while the integration of GSP into Orleans was about leveraging and improving performance of the existing cluster environments.
+Ultimately, GSP and related approaches may not be worthwhile for the use on end-user devices, because the requirement of a central coordinator means that offline usage is limited and use of peer-to-peer communication is unfeasible.
+State-based CRDTs do not share those limitations, and we believe that similar optimizations are also applicable to CRDTs in specific execution environments.
+
+
+## Monotonic Synchronization
+
+:cite{style=name; Hellerstein2019} discuss why monotonic data structures work well in distributed systems,
+because they can represent exactly the class of applications that can be available and eventually consistent:cite{; Hellerstein:2010:DIE}.
+This is reflected in several programming paradigm approaches in addition to :{cvtr}.
+
+:cite{Bloom; Conway:2012:LLD} is an experimental language that explores a programming paradigm where all operations are monotonic.
+Due to composability of monotonicity all program that are implemented using only monotonic operations are also monotonic.
+The experiments with Bloom show that programming using monotonic operations is not that much different from programming using other paradigm – although it is necessary to develop new algorithms for many common tasks (e.g., sorting).
+
+The :cite{Lasp; Meiklejohn:2015:LLD,Meiklejohn:2015:IUG} language tackles the problem of
+deriving one CRDT from another,
+while keeping track of which change on the source CRDT caused a change on the derived CRDT.
+Thus, Lasp prevents multiple derivations on different hosts to create duplicate entries.
+To achieve this, however, Lasp only supports a limited set of derivation operations.
+
+:cite{LVars; Kuper:2013:LLD} use monotonicity for deterministic concurrency,
+by only allowing threshold reads, which make reading of a lattice-based data structure deterministic in the presence of multiple parallel writes.
+:cite{style=name; Kuper2014} discuss the combined use of lattices for deterministic parallelism and distribution.
+
+
+## CRDTs and Databases
+
+Recent advances include CRDTs directly into distributed databases:cite{; Shapiro:2018:JRCAntidote}.
+Client applications connect to an instance of the database.
+The database takes care of all communication and replication, allowing clients to be written in a traditional client-server style.
+There are two layers to consider, the API for communication between the application and the database, and the communication between multiple instances of the database.
+
+The communication between the application and the database is how individual operations are replicated for operation-based CRDTs.
+Applications send commutative CRDT operations to the database.
+The instance of the database applies those operations locally.
+Replication to other instances of the database happens asynchronously.
+Communication between database instances is similar to how replication works in :{cvtr}.
+
+Using an operation-based API to communicate with the database has all the problems of operation-based CRDTs.
+Requiring support for CRDTs in the database also results in a loss of flexibility for the application.
+New CRDTs can no longer be added by the application, but must be part of the database instead.
+To the best of our knowledge there is no database using CRDTs that allows an application to extend or program the used CRDTs.
+
+
+:cite{style=name; Goldstein2018} argue for using database techniques to provide durability for general purpose applications,
+by logging all incoming actions for the application and replaying the log in case of failures.
+This approach allows applying many common database operations,
+but it also requires applications to be rewritten in a way to be deterministic, based on the received inputs.
+This has some similarities to the global sequence protocol and is related to the discussion of transactions as monotonic operations in :ref{Section; section-crdts-transactions-are-monotonic}.
+
+
+## Operational Transformation and Text Synchronization
+
+Text editing was one of the original problems of digital collaboration and still remains a challenge.
+:cite{style=name; Grishchenko2020Chronofold} provide a survey of the history for collaborative text editing.
+The main strategy used today is operational transformation (OT) where individual operations are sent to remote devices and applied there.
+To prevent conflicts, the applied operations are transformed to match the current state of the device, e.g., the insertion position of a new character is changed to accommodate for other characters having been inserted previously.
+The issue with OT is the complexity of the algorithms to ensure correct transformations in a decentralized setting.
+To address this challenge in practical deployments of such systems, most implementations of OT employ a centralized server to ensure correct ordering and transformation of operations.
+The alternative to OT are specialized CRDTs.
+While CRDTs are simpler than OT and work in a peer-to-peer setting, they often have a high overhead for each individual atomic element, i.e., overhead for each single character in a text editing setting.
+This usually results in high metadata overhead for CRDT-based approaches, although this issue is under active research.
+
+
+## Mixed Consistency
+
+:cite{style=name; Myter:2018:CDP} investigate enabling switching between strong consistency and eventual consistency for communication in a single language.
+They have an eventually consistent data type similar to replicated reactives,
+but show that strongly consistent data types may co-exist in the same level of abstraction,
+as long as the application is tolerant to unavailability in case of connection problems.
+:cite{style=name; Meiklejohn:2017:DDP} argues for the need of languages to support both forms of synchronization,
+based on earlier arguments by :cite{style=name; Landin:1966:NPL}.
+We have explored this direction a little by implementing a consensus algorithm as a replicated reactive in :{rescala} in :ref{Section; sec-paxos_as_crdt}.
+This implementation shows that our model does indeed allow multiple types of consistency at the application level, even if our programming paradigm only offers a single form of consistency.
+
+:cite{style=name; Zhang2014} argue that many traditional applications become distributed,
+so a flexible model where distribution is specified as library function is needed.
+Their solution allows customizable behavior for remote communication for each group of objects.
+However, they make use of centralized services with unclear behavior in case of faults.
+
+:cite{ConSysT; DBLP:journals/pacmpl/KohlerEWMS20} extends the object-oriented paradigm with a type system that tracks the consistency level of objects.
+Similar to an information flow type system, ConSysT ensures that there are no dependencies where an object with strong consistency derives its value from an object with weak consistency.
+
+
+## Language-based Concurrency Abstractions
+
+Small-scale concurrency tools, e.g., atomic compare-and-swap operations or locks for mutual exclusion, are ubiquitous, but hard to compose.
+Language abstractions such as futures and :cite{async/await; tasirlar2011data} allow composing asynchronous tasks.
+Software Transactional :cite{Memory; Shavit:1995:STM:224964.224987} schedules arbitrary, :cite{composable; Ni:2007:ONS:1229428.1229442} read/write transactions.
+:cite{Reagents; turon2012reagents} are abstractions for implementing data structures that can be safely composed into concurrent algorithms.
+

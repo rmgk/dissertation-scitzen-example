@@ -1,0 +1,323 @@
+== Faults and Resiliency
+label = chapter-resilient_state
+
+In a world with fast and reliable networks the design of :{apps} would not need to distinguish between distributed and non-distributed cases.
+Edges in the :{flowgraph} would simply span over multiple devices and network boundaries would have no impact on application design.
+However, in reality networks and devices are slow and unreliable and the most common system environments (i.e., web, mobile) regularly shut down running applications.
+Yet, we do not wish to abandon the simplicity of transactions and strong consistency for operations that are not affected by these issues.
+Thus, the disparity of reliable operations and fault-prone communication must be explicitly considered during the development of :{apps}.
+To help developers do so, :{cvtr} automatically provides a combination of strong consistency and causal consistency, and makes it explicit where the different levels of consistency interact.
+
+We have already seen in the previous chapter what this looks like for the developers.
+Replicated reactives provide explicit interactions between the strong consistency of transactions on a local device.
+Explicit replication is crucial to make developers aware at which points the consistency model is different.
+Due to all dependencies in :{cvtr} being explicit it is then straightforward for developers to inspect which parts of their design is affected by replication.
+
+This chapter explains what remains invisible to developers: how fault tolerance is automated to achieve the developer friendly consistency.
+Automation is enabled by taking some control of the state of the application away from developers.
+In return, developers may always assume that the state of their application is consistent independently of the occurrences of faults.
+
+Specifically, there are two parts to fault tolerance: persistent storage and synchronization between devices.
+Both cases are solved and explained individually and provide individual value, but they both complement each other if used together.
+The rest of this chapter extends the intuition given in :ref{Chapter; chapter-demonstration} of how these two solutions in combination solve a large class of errors when applications are executed in a distributed environment.
+But first, we discuss the types of addressed faults in more detail.
+
+
+# Addressed Types of Faults
+
+We use the term :emph{fault} to refer to the origin of a failure
+and :emph{error} to refer to the representation of a fault in the language :cite{Laprie1995}.
+The types of faults tolerated by :{rescala} are crashes and disconnects.
+
+We use the term crash to refer to any situation where a part of a distributed application running on a single device terminates.
+This may include the physical device crashing because of some unrelated failure in the host system, because of the device running out of battery or another form of power outage, or because the device reboots after an update terminating the application forcefully.
+The crash may also only apply to the application not to the whole device.
+The execution environments of :{apps} often terminate applications for various reasons.
+Example reasons for termination include the environment running out of memory, compute clusters ofter stop less important tasks when more important tasks must be executed, mobile operating systems terminate applications arbitrarily while they are not the active focus of the user, and web applications are terminated by a simple reload of the containing browser tab.
+In all of these cases the application is considered crashed.
+:{cvtr} assumes that in all cases the application will be restarted by the device at some point and then the state of the application must be restored.
+Permanent failures are not addressed, because they are not very interesting in the context of :{apps}.
+Some cluster systems restart crashed applications on a spare device, but that does not make much sense for mobile phones or web browsers – when your mobile phone runs out of battery, you usually do not expect to be replaced by some other user that happens to still be available.
+
+Disconnects between devices are due to crashes of remote devices (for all the above reasons)
+or due to broken network links.
+Disconnects cause messages to get lost or reordered, resulting in an inconsistent state across devices.
+An important design of :{cvtr} is that the :{apps} on each device work even when the device is completely offline.
+While for some types of :{apps} functionality may be vastly limited without connectivity all local operations are still available and when connection is restored then consistency between the reconnected devices is established again.
+This makes :{cvtr} especially useful for all :{apps} where users are not simply consuming remote content, but rather productively work with the application.
+
+Our solutions do not address data corruption (malicious or accidental).
+The latter is usually handled at a lower layer using checksums for both stored state and send messages.
+We also do not explicitly consider active attacks.
+We usually assume that devices authenticate themselves before synchronizing their state with other devices to prevent attackers modifying user data.
+However, because of how data in :{cvtr} is stored, it is easier to restore data after incorrect modifications, and because applications work offline users are less susceptible to denial-of-service type attacks – users can continue working even if communication is unavailable.
+
+
+# Fault-tolerant Application State
+label = sec:recovery
+
+Crashes of individual devices during the execution of an application may result in a loss of the state of the :{flowgraph} hosted on these devices.
+Loss of local device data is problematic since such data often contains important private or unsynchronized information.
+To address this issue, :{rescala} provides automatic snapshots and recovery.
+We have already discussed the developer API for restoration in :ref{Section; sec-shared_calendar-example}.
+In summary, developers give names to reactives in the :{flowgraph} when they consider the state of the reactive essential to the application.
+Note that :{rescala} provides the option to statically enforce that all state of an application is restored after a crash, but that option is not the default, because it turns out that developers prefer to opt in to what state should be stored.
+The rest of this section discusses crash tolerant signals in detail, and then describes how snapshots are created and restored.
+
+
+
+## Crash-tolerant Signals
+
+Signals hold state and are restored after a crash, either by loading the value from a snapshot, or by recomputation.
+For example, in the calendar application, each calendar entry must be restored from the snapshot, but derived information such as the layout of the entries on the screen can be recomputed.
+:{rescala} is capable to automatically determine the minimum set of signals that are required to include in a snapshot such that from those signals all others can be recomputed.
+However, it turns out that developers want precise control over what state is restored.
+For example, the view of the calendar should always display the current week when the application is started, thus any changes to that view should not be persisted.
+Thus, :{rescala} allows developers to explicitly use :code{Storage.persist} to specify which reactives to persist.
+An alternative would have been to allow opting out of restoration, but our case studies indicate that the application code is easier to understand the use of restoration is explicit – which aligns with our overall strategy for fault tolerance.
+For the remaining discussion, however, we generally assume that all state of an application should be restored and show how that process is automated.
+
+Technically, persisting takes an :code{id} and a :code{default} parameter.
+The ID of a stored signal is used to identify which value in a stored snapshot corresponds to which signal in the application and the default is used when the current snapshot does not contain a matching ID (e.g., when the application is started for the first time, without a snapshot).
+We use the Scala type system to require that the values of signals that are included in snapshots are serializable (i.e. can be stored to disk).
+For example, a signal containing a calendar date of type :code{Signal[Date]} in requires that the :code{Date} type is serializable.
+
+Each device has its own application code together with its own storage for state.
+When a device crashes, the runtime representation of the :{flowgraph} is lost, including all values of reactives.
+The :{flowgraph} itself can be reconstructed from the application code
+and values of reactives are restored from the snapshot.
+Every processed transaction updates the snapshot at the end of the transaction,
+thus losing at most the latest interaction with the user (i.e., a single press of a button).
+Creating snapshots is incremental – only values changed by a transaction are updated in the snapshot.
+In the first place, only the few reactives with state essential to the application are included in the snapshot and the value of all other reactives is recomputed from those during restoration.
+We trade efficient frequent snapshots for more expensive but rare restorations.
+:ref{Section; chapter-formalization} elaborates on further
+details and proves the correctness of restoration from minimal snapshots.
+
+
+## Snapshot Anatomy
+label = sec:recovery:snapshot-definition
+
+Conceptually, a snapshot is a mapping of the reactives to their current values.
+Neither the structure of the :{flowgraph} nor any other state is required for restoring a snapshot.
+Applications often store redundant derived state in memory for efficiency – this pattern is especially prevalent with derived signals which are basically all recomputable.
+For example, a histogram displayed to the user can be recomputed from database entries,
+but it would be expensive to repeat this process for every frame the application displays.
+Non-distributed :{rescala} applications
+typically consist of many small derived parts of the
+state (i.e., single reactives) to take advantage of incremental updates.
+In such a setting, :{rescala} detects derived state and excludes it from snapshots.
+Precisely, in :{rescala}, the only reactives with values that cannot be recomputed
+are source signals (capturing external state) and fold signals (aggregating event occurrences), since their state depends on past user interactions.
+All other reactives are either stateless events or derived signals that can re-execute their user-defined functions to recompute their state.
+We say that sources and folds constitute the :emph{essential state},
+and :{rescala} recovers the state of all reactives from the essential state.
+
+
+## Creating Snapshots
+
+In traditional paradigms for interactive applications developers must carefully reason about when the application may create a snapshot, because snapshots should not include transitional state.
+However, transactions correspond to a single user perceived change and provide the boundaries for fault tolerance.
+Thus, snapshots are created as part of each transaction and each snapshot correspond to a user perceived change.
+Moreover, the transaction manager also protects the snapshot mechanism from any external control flow for free.
+
+Storing a full snapshot of all the essential state after each transaction is wasteful,
+since only a subset of the reactives change.
+Full snapshots are especially problematic when considering modularity of applications, because composing modules would suddenly incur an overhead on unrelated transactions.
+Instead of full snapshots, :{rescala} keeps track of all reactives that are changed during a transaction.
+Snapshots are then stored incrementally and only reactives changed by a transaction are updated in the snapshot.
+Thus, the cost of snapshots grows linearly with the size of transactions, not linearly with the size of the application.
+
+## Recovering State
+label = sec:recovering-snapshots
+
+For recovery, :{rescala} re-executes the application to restore the structure of the :{flowgraph}, but restores the values of reactives from the snapshot instead of initializing them.
+During this recovery process, the value of each signal with essential state is restored to the state after the last completed transaction before the crash.
+Events do not have state, so no value is restored.
+Derived signals recompute their values from the restored values.
+As the :{flowgraph} is acyclic, it is guaranteed that input reactives are always restored before any derived reactives.
+To handle dynamically changing :{flowgraph}s, the recovery process is also incremental.
+Reactives are restored as soon as they are created during the re-execution of the application.
+Thus, :{rescala} allows the restored parts of the application to already handle new interactions,
+while other parts are still recovering.
+
+
+We make two arguments why recomputation is preferable over storing more values in the snapshot.
+First, a snapshot is created every time an update occurs,
+while restoration only happens when a device fails.
+Hence, storing only necessary state has performance benefits if the latter
+is only a small portion of the overall state (cf. :ref{Section; section-performance-snapshots} for an empirical evaluation).
+In a previous :cite{study; Salvaneschi2014}, we reported that
+in a typical reactive application only :math{14\%} of the :{flowgraph} contains essential state.
+Second, and arguably more important than the performance, only the essential parts of the state need to be serializable,
+thus allowing the use of data types that cannot be (efficiently) serialized for the rest of the application.
+In general, serialization works on the level of individual reactives, thus performance is heavily dependent on the serialization performance and the size of state changed in each individual transaction.
+
+
+## Observers
+label = sec:snapshot-observers-invariants
+
+:{rescala} only restores state that is part of the :{flowgraph}.
+To ease integration with external libraries, :{rescala} executes observers on signals during restoration.
+For example, when the list of selected entries of the calendar is restored,
+the observer that informs the UI about updates is executed.
+In general, observers allow developers to define a relationship between the changes of transactions – including restoration – and some external state.
+In the case of signal observers, the relationship is that the external state should always be computed by the observer function, using the current value of the signal.
+Executing the observers during recovery allows the application to uphold this relationship.
+However, it is ultimately the responsibility of the application to use correct handlers.
+Events have no state to be restored (because snapshots are only stored between updates),
+so the handlers on event observers are not executed during restoration.
+
+
+# Managing Distributed State
+label = sec:replication
+
+::figure{label=fig:replication:distributed-signals}
+  :image{/Figures/Graphs/4-devices-distributed-dataflow-graph.pdf}
+  Full :{flowgraph} of a distributed application (left) and abstract dataflow (right).
+::
+
+This section presents how :{rescala} keeps the application responsive when network connections are not reliable and still ensures that the state of different replicas of the same application remains consistent.
+The key idea is to manage fault tolerance at the level of replicated data structures and ensuring their consistency instead of handling fault tolerance at the level of individual messages.
+
+
+
+
+## Replicated Reactives
+The smallest unit of replication are individual reactives.
+:emph{Replicated reactives} model a shared piece of state that is replicated to the :{flowgraph}s of multiple devices.
+Unlike derivation of reactives, replication creates a bidirectional connection between these reactives, thus extending the :{flowgraph} beyond device boundaries.
+For illustration, consider the left part of Figure :ref{fig:replication:distributed-signals}, which shows four devices each having its own local :{flowgraph}.
+Reactives A, B, C are replicated (C is replicated in Dev 2 and Dev 4, A in Dev 1 and Dev 2, and B in Dev 1, Dev 2, Dev 3).
+The right of the figure shows the abstract dataflow of the overall distributed application.
+For example, even though reactives d (Dev 1) and e (Dev 2) are on different devices, a change of d will eventually reach e.
+However, because remote communication is slow and unreliable transactions are bounded within one device.
+The semantics for replicated reactives is as follows.
+
+Replicated reactives behave like normal reactives with regard to device-local dataflow.
+Their state is computed from their inputs, propagated to their outputs, and stored in the local snapshot.
+Unlike the directed connections between reactives on the same device, connections between replicas work in any direction.
+Each device can change the state of its replica independently, even while being disconnected from the rest, thus transactions must be able to complete locally.
+Local transactions cause the state of the replicas to diverge.
+
+To still provide a convenient user experience the devices use eventually consistent synchronization when communication is possible.
+:{cvtr} requires the existence of an eventually consistent synchronization protocol for the state of each individual replicated reactive.
+In :{rescala} replicated reactives are implemented using
+:cite{state-based conflict-free replicated data types (CRDTs); Shapiro2011} for the state of those reactives.
+CRDTs provide automatic conflict-free merging of diverged state for
+a wide range of common data :cite{types; Shapiro2011}.
+A CRDT in :{rescala} consists of a :emph{lattice} and a set of local operations to modify the state of the CRDT.
+A lattice is a structure where every two values can be merged using an associative, commutative, and idempotent merge function that provides eventual consistency.
+While CRDTs usually have a limited set of possible operations, we argue in :ref{Chapter; chapter-crdts} why this is not an additional restriction for :{cvtr}.
+
+The example in Figure :ref{fig-shared_calendar-code} illustrates how :code{ReplicatedSet} is used as the value type for the replicated reactive :code{entrySet} which is then replicated in the network.
+The underlying lattice of :code{ReplicatedSet} is a simple set of values with set union as its merge function.
+The only local operation allows adding values to the set, which is used by the application to add new calendar entries.
+The set of entries is synchronized between all devices that use a replicated signal with the same name and type.
+Due to the properties of the merge function, the state of replicas can always be synchronized,
+and eventually all devices will converge to the same set containing all added elements.
+
+For a set, once all replicas have been merged with each other, they all contain the same elements.
+In addition to :code{ReplicatedSet}, :{rescala} currently supports
+replicated counters, last-writer-wins registers, ordered lists,
+and replicated data types that allow adding and removing elements from sets and lists.
+By using conflict-free data types – an existing technique already known to programmers –
+we provide simple and intuitive semantics for sharing state across devices.
+
+## Replication and Transactions
+
+The local operations on CRDTs enable their use as values when deriving reactives, and their state-based nature enables their integration with snapshots and recovery.
+Both local changes or a local restoration are synchronized by merging the diverged states of different replicas.
+Every change to the value of a CRDT, both local and remote, is immediately propagated to local derived reactives.
+However, some transactional properties are lost at the device boundaries, because :{cvtr} prioritizes offline availability over strong consistency.
+Most users of interactive application prefer their applications to work offline, and they understand that their collaborators do not see their changes while they are offline.
+
+Still, :{cvtr} keeps some transactional properties, most importantly, the causal consistency of changes to multiple reactives is preserved between two devices.
+For example, Dev 1 and Dev 2 in Figure :ref{fig:replication:distributed-signals} try to synchronize their state after every transaction.
+:% If the network is faster than the rate at which new transactions are created, then both reactives A and B will always have the same state on both devices, which behaves as if the transaction spanned both devices.
+With slow network connections – a disconnect is a very slow connection – Dev 1 and Dev 2 may have different states for reactives A and B.
+However, all remote changes to replicated reactives are applied as a single transaction, thus still providing causal consistency because changes from one reactive do not become visible before earlier changes of another reactive.
+For example, when Dev 2 changes reactive A, then reactive B also changes in the same transaction because of the connection in the local :{flowgraph}.
+Dev 2 sends the most recent state of both reactive A and reactive B to Dev 1.
+When the result of such a transaction from Dev 2 is received by Dev 1 the changes are applied as a single transaction on Dev 2, thus changing both reactives A and B and keeping the causal connection between their changes.
+Causal consistency aligns well with end user expectations.
+Causal consistency prevents situations where an answer (e.g., the value of reactive B) is visible before the original message (e.g., the value of reactive A) – a situation that is highly confusing to most users.
+
+
+The first lost property of transactions is their identity.
+Only the most recent state is synchronized, thus Dev 2 may execute many transactions while offline, but Dev 1 will only apply the latest changes as a single transaction.
+:{rescala} provides operators that are sensitive to the number of transaction, most notably many of user-defined functions for fold reactives execute their function once per transaction.
+It depends on the application, if the semantics of the user-defined function is actually dependent on the number of transactions.
+The order sensitive operators have to be inspected by the developer and depending on their semantics they must also be replicated over the network to ensure consistency.
+For example, the count operators counts the number of changes to its input reactive.
+If the changes to a single replicated reactive are counted on two different devices, the count may be different.
+Thus, to ensure consistency, the count reactive must also be replicated.
+:% To help developers, :{rescala} enables inspection of the :{flowgraph} to find all reactives requiring manual inspection.
+
+The second lost property is what is called :cite{distributed glitch freedom; DBLP:phd/dnb/Drechsler19}.
+For example, consider again the graph in Figure :ref{fig:replication:distributed-signals}.
+An update that affects reactive A on Dev 2 will immediately affect reactive B on Dev 2 because they are connected by the local :{flowgraph}.
+However, if A is updated on Dev 1, B is only indirectly affected and synchronization with Dev 2 is required to complete the update.
+In a local graph, being able to observe the changed state of reactive A without also observing the changed state of a derived reactive B is called a glitch.
+When the derived reactive is only connected over device boundaries, this is called a distributed glitch.
+Distributed glitches always require at least two network connections: either a cycle as in the example or a diamond shape with at least three devices.
+To prohibit distributed glitches, Dev 1 would have to wait for the update on B to arrive,
+whenever A is changed.
+:{rescala} (as presented in this thesis) allows for distributed glitches in favor of availability (but :cite{style=name; DBLP:phd/dnb/Drechsler19} provides serializable distributed transactions for :{rescala} – losing availability).
+It is possible to analyze the :{flowgraph} and predict when a distributed glitch may occur, although it cannot be completely accurate with dynamic graphs and offline availability.
+In general, users usually appreciate when they are informed that their changes have not yet been confirmed by a remote connection and will understand that some changes or functionality thus is only applied later (e.g., a remote spell checker only highlighting mistakes after a couple of seconds).
+
+
+## Obscure Interactions: Published Signals, Replicated Events, and Nested Reactives
+
+We have covered the core of distributed state in :{cvtr}.
+However, there are three additions covered here that make using replication in :{rescala} more convenient.
+First is a simplification when bidirectional communication is not required.
+Second is how replicated events are handled.
+Third is what happens when nested reactives are replicated.
+
+Using CRDTs to implement replicated signals allows bidirectional communication,
+but the value of the reactive must be a CRDT.
+Alternatively, :{rescala} allows to :emph{publish} any signal –
+not only those based on CRDTs.
+Such a published signal is a replicated signals that may only be changed by the publishing device, thus precluding conflicting changes.
+Publishing is a special case of eventually consistent replication.
+To publish a signal,
+:{rescala} creates a replicated signal with a last-writer-wins CRDT,
+a data type where the merge function always selects the most recent value.
+Since only one device is allowed to write, there are no races between writes.
+
+Replication in :{cvtr} is based on synchronized state, but events do not have state, thus replication of events is not directly supported.
+Instead, events must be converted to signals first
+typically by using the :code{latest(n)} operator that creates a signal containing the latest :code{n} occurrences of the event.
+If more than :code{n} events occur when the device is disconnected,
+the oldest events will be lost.
+Similar operators can be used to define time or priority-based policies,
+allowing the application developer to tune the software behavior as necessary.
+
+Replicated reactives may contain nested reactives.
+The value of nested reactives is synchronized independently of the containing reactive – that is, the containing reactive only synchronizes a reference to the nested reactive, but not the value.
+Depending on the network model and protocol, the transfer of values of individual replicated reactives may fail or be delayed.
+When the outer reactive is synchronized but the inner reactive is delayed, then the application may lose causality.
+:% Technically, a similar issue may also occur without nested but with multiple replicas with only partial connections, but nested reactives only require two replicas to cause problems.
+To fix this issue, reactives nested in a replicated reactive must be considered as part of any transaction that changes the containing replicated reactive.
+Then the normal mechanism that ensures causal consistency also applies for nested reactives.
+
+
+# Replication and Restoration
+
+When a replicated reactive aggregates state, then that state must both be synchronized with other devices and included in snapshots.
+For those reactives, all types of faults may disturb their operation leading to complex failure cases.
+For example, a device may leave the network, make some changes while offline, shut down and later restore from a snapshot, and finally reconnected to a different part of the network.
+Yet, as long as devices are at least sporadically connected to some other device in the network, then the network runtime of :{rescala} will ensure that all replicas of the replicated reactive have the same value on all devices.
+This includes replicating state after recovering from a crash to ensure that all devices eventually see the same set of entries.
+Thus, no matter the combination of failures, the state of a :{cvtr} application will be fully recovered and consistent on all replicas that are connected.
+
+
+# Conclusion
+
+:{cvtr} addresses crashes and disconnects in a way that simplifies the programming model two a two tiered system for the programmer.
+Local devices are considered consistent but may have to be restored after a crash, while communication is eventually consistent and done on a best-effort basis.
+Both parts of the solution are individually useful for their specific case (only addressing crashes, or only disconnects) but their strength is that they still work when both types of faults occur together.
+Even when a device crashes while it is offline the state is restored and will be correctly synchronized when connectivity is established again.
+

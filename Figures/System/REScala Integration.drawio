@@ -1,0 +1,34 @@
+<mxfile host="Electron" modified="2020-12-23T15:32:28.074Z" agent="5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/13.9.20 Chrome/87.0.4280.60 Electron/11.0.1 Safari/537.36" etag="Q6rr3Uu1PBvG7cu2jjfi" compressed="false" version="13.10.0" type="device">
+  <diagram id="F4RVQw-NW0wX3LFldfRO" name="Page-1">
+    <mxGraphModel dx="652" dy="687" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2339" pageHeight="3300" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="4AyAHxdlo7ERoLbcGwGA-17" value="Host Lang" style="shape=partialRectangle;whiteSpace=wrap;html=1;bottom=1;right=0;left=1;top=1;routingCenterX=-0.5;rounded=1;glass=0;sketch=0;strokeColor=#000000;fontFamily=Linux Libertine O;fontSize=14;direction=east;shadow=0;" parent="1" vertex="1">
+          <mxGeometry x="730" y="640" width="40" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4AyAHxdlo7ERoLbcGwGA-26" value="Flow Graph" style="shape=partialRectangle;whiteSpace=wrap;html=1;bottom=1;right=0;left=1;top=1;routingCenterX=-0.5;rounded=1;glass=0;sketch=0;strokeColor=#000000;fontFamily=Linux Libertine O;fontSize=14;direction=east;shadow=0;fillColor=#CCFFCC;" parent="1" vertex="1">
+          <mxGeometry x="770" y="660" width="210" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="4AyAHxdlo7ERoLbcGwGA-11" value="&lt;span style=&quot;font-size: 14px;&quot;&gt;Scala Application&lt;/span&gt;" style="shape=partialRectangle;whiteSpace=wrap;html=1;bottom=1;right=1;left=1;top=0;routingCenterX=-0.5;rounded=1;glass=0;sketch=0;strokeColor=#000000;fontFamily=Linux Libertine O;fontSize=14;direction=north;shadow=0;" parent="1" vertex="1">
+          <mxGeometry x="770" y="640" width="130" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="4AyAHxdlo7ERoLbcGwGA-15" value="&lt;span style=&quot;font-size: 14px;&quot;&gt;Scala Functions&lt;/span&gt;" style="shape=partialRectangle;whiteSpace=wrap;html=1;bottom=1;right=1;left=1;top=0;routingCenterX=-0.5;rounded=1;glass=0;sketch=0;strokeColor=#000000;fontFamily=Linux Libertine O;fontSize=14;direction=north;" parent="1" vertex="1">
+          <mxGeometry x="770" y="680" width="130" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="4AyAHxdlo7ERoLbcGwGA-22" value="Environment" style="rounded=0;whiteSpace=wrap;html=1;shadow=0;glass=0;sketch=0;strokeColor=#000000;fontFamily=Linux Libertine O;fontSize=14;align=center;labelBackgroundColor=none;" parent="1" vertex="1">
+          <mxGeometry x="770" y="620" width="210" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="4AyAHxdlo7ERoLbcGwGA-23" value="REScala" style="shape=partialRectangle;whiteSpace=wrap;html=1;bottom=1;right=1;left=0;top=1;routingCenterX=-0.5;rounded=1;glass=0;sketch=0;strokeColor=#000000;fontFamily=Linux Libertine O;fontSize=14;direction=east;shadow=0;flipV=1;flipH=0;fillColor=#CCFFCC;" parent="1" vertex="1">
+          <mxGeometry x="980" y="640" width="50" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4AyAHxdlo7ERoLbcGwGA-24" value="&lt;span style=&quot;font-size: 14px;&quot;&gt;Integrations&lt;/span&gt;" style="shape=partialRectangle;whiteSpace=wrap;html=1;bottom=1;right=0;left=1;top=1;routingCenterX=-0.5;rounded=1;glass=0;sketch=0;strokeColor=#000000;fontFamily=Linux Libertine O;fontSize=14;direction=east;shadow=0;fillColor=#CCFFCC;" parent="1" vertex="1">
+          <mxGeometry x="900" y="640" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="4AyAHxdlo7ERoLbcGwGA-25" value="Built-ins" style="shape=partialRectangle;whiteSpace=wrap;html=1;bottom=1;right=0;left=1;top=1;routingCenterX=-0.5;rounded=1;glass=0;sketch=0;strokeColor=#000000;fontFamily=Linux Libertine O;fontSize=14;direction=east;shadow=0;fillColor=#CCFFCC;" parent="1" vertex="1">
+          <mxGeometry x="900" y="680" width="80" height="20" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,60 @@
+== Conclusion and Future Work
+
+Fault-tolerant :{apps} are easy to achieve when a suitable programming paradigm – such as :{cvtr} – is used.
+It is well known, that it is impossible to achieve the guarantees of a single reliable device in a distributed system.
+However, the :{cvtr} programming paradigm does not need strong consistency to provide interactivity and collaboration.
+Users of :{apps} have requirements that align well with the realities of distributed systems.
+
+To address the remaining challenges of application development, we provide developers with automatic fault tolerance for :{apps}.
+We have formalized the core model of the programming paradigm and proven the correctness guarantees that it provides.
+We have proven causal consistency and crash restoration together with transactional guarantees.
+:{rescala} implements the programming paradigm, keeping all of its guarantees, while adding modular integration with other paradigms.
+We have seen that :{rescala} is suitable to implement case studies that – combined – face all the challenges of :{apps}.
+Integration with exceptions, compilation to embedded devices, and a protocol for debugging and live modifications show that the programming paradigm and its implementation has a broad potential for extensions without sacrificing its core guarantees.
+
+Looking at the larger picture, our reason to design a programming paradigm with automatic fault tolerance was to democratize the development of :{apps}.
+We do believe that :{rescala} is a significant step in enabling many developers to create correct and useful :{apps} quickly.
+However, there are interesting directions for future improvements.
+
+:{cvtr} chooses causal consistency as the only form of communication between devices.
+But, we also discussed the use of consensus as part of a replicated reactive in :ref{Section; sec-paxos_as_crdt}, and :cite{style=name; DBLP:phd/dnb/Drechsler19} implements serializable distributed transactions for :{rescala}.
+Thus, developers already have a choice of potential consistency guarantees available.
+However, developers want to reason about the behavior of their application – the application’s invariants – not choose a combination of consistency guarantees and worry about if those fulfill their requirements.
+:cite{style=name; DBLP:journals/pvldb/WhittakerH18} show one solution to automatically combine multiple forms of consistency based on invariants given for an application.
+These results align well with the goal of :{cvtr} to let developers focus on the applications semantics and automate fault tolerance.
+We believe it is possible to enhance the existing knowledge about the applications structure of :{cvtr} with invariants to provide a correct mix of different consistency levels automatically.
+
+
+Consider deployment of :{apps} on many devices.
+We have discussed in :ref{Chapter; chapter-compilation} that the :{cvtr} programming paradigm is suited to be compiled to embedded devices and our case studies have shown that :{rescala} can run everywhere from smartphones to laptops and servers.
+Currently, developers have to manually decide on which device a reactive is executed.
+This fits the classic execution model where the responsibilities of classes of devices (such as “client” and “server”) can be predicted during development.
+However, consider a computation that requires specialized resources such as a GPU.
+It is conceivable that future extensions to :{cvtr} could automatically place such a computation on a fitting device at runtime, because the structure of the :{flowgraph} enables reasoning about how the involved data must be moved.
+The problem becomes more relevant if many classes of devices exist in the network.
+Networks with many device classes seem to be common in IoT deployments, with devices ranging from small sensors, to routers, laptops, and even home servers.
+With capabilities such as compiling for Wi-Fi chips, the need for automatic deployments even occurs on a single device using different types of processors.
+A device that has a programmable Wi-Fi chip (or GPU, etc.) may want to offload computation to that specialized hardware.
+Because it may not be clear during development of applications what device capabilities are available, it is desirable to have the runtime automatically place computations based on some optimization criteria.
+
+
+Also related to deployment on many devices – but many similar devices in this case – are clusters and “the cloud”.
+We have discussed that distributed data processing platforms already provide a suitable model for effectively using computation resources in a cluster.
+However, it is easy to conceive applications that are a mix out of :{apps} and data processing systems.
+For example, video editing, computer aided design, 3D rendering, etc., are interactive and collaborative applications, but they also need to execute typical data processing tasks.
+The programming paradigms underlying systems such as Flink (c.f., :ref{Section; section-related_work-automatic_fault_tolerance_clusters}) are similar to :{cvtr} – they also describe a form of :{flowgraph}.
+Currently, :{cvtr} has no concept of executing the same computation on different data in parallel, but investigating a combination of these programming paradigms could eventually lead to a unified model for :{apps} and data processing systems in the future.
+:cite{style=name; DBLP:phd/dnb/Drechsler19} already shows how to pipeline processing of values in the :{flowgraph} and a similar strategy could be applied to process events in parallel.
+
+Versatile event correlation:cite{; DBLP:phd/de/Bracevec19} provides data processing systems with much more flexible specifications for computations.
+:{cvtr} currently treats user-defined computations as black boxes, and this black box could contain an event correlation system.
+However, versatile event correlation has the potential to allow reasoning about the order and time of transactions, and also provides declarative specifications of complex interactions of multiple reactives.
+Thus, versatile event correlation interacts with core parts of :{cvtr} and an integration of the two paradigms could potentially lead to better guarantees – especially if the correlation engine could be used to reason about eventually consistent reactives.
+
+
+
+Finally, there are other programming paradigms that build something akin to the :{flowgraph}.
+One example is :cite{TensorFlow; tensorflow2015-whitepaper}, which composes operations on multidimensional matrices (tensors) into a graph to compute the derivate of the composed operations.
+Considering the graph-based nature of such programming paradigm raises the question of what their relation to :{cvtr} is and if there is an elegant unification of such paradigms.
+Maybe there is a future where the prevalent programming paradigms are those that use declarative connections between their individual building blocks.
+

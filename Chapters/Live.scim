@@ -1,0 +1,297 @@
+== Debugging and Live Tuning
+label = chapter-live_tuning
+
+The :{flowgraph} of :{cvtr} provides an interesting opportunity for developer tooling because it
+enables the development of interactive applications in a style that is well-suited for visualization,
+is flexible enough to be adapted at runtime by non-experts,
+and provides :emph{data safety}, i.e., data is not lost or processed inconsistently even when modified by external factors.
+
+Debuggers for reactive programming already allow
+inspection of an application through its :{flowgraph} during :cite{execution; Salvaneschi:2016:DRP:2884781.2884815}.
+Based on those reactive debuggers, we pave the way towards modifying the behavior of applications at runtime – a process called live programming.
+
+First, we extend an existing reactive debugger to allow for runtime modifications to the application.
+We provide some benefits of live programming to application developers while ensuring that modifications always stay within the confinements defined by the application code,
+specifically, guarantees given by the type system still hold, and data dependencies in the application are kept consistent.
+
+Second, we investigate how applications may be inspected and modified even by their users.
+Our goal is to enable developers to create applications that can be tuned by domain experts.
+To this end, we propose patterns and idioms as well as new language abstractions for specifying tuning points of the applications
+for domain experts and thereby retaining basic safety and correctness guarantees of the application.
+
+
+We assume three levels of expertise.
+First, the :emph{language and tool authors} who design very general abstractions and mechanisms to implement arbitrary applications.
+This first group, however, has no knowledge of the domain or requirements of the final application,
+which is written by the second group – the :emph{developers}.
+Developers use the abstractions and tools of the language to implement concrete application semantics.
+Developers determine concrete use cases for their application.
+They are responsible for ensuring that the application behaves as desired.
+We assume they are familiar with the abstractions provided by the language and are able to use them correctly.
+The third group, the :emph{domain experts} of the application, have concrete tasks they want to solve with the application.
+Because tasks often vary slightly and those variations are not always predictable by developers,
+domain experts may also need to vary the behavior of the application.
+However, because domain experts do not have prior knowledge of application development,
+it is only appropriate for them to change existing behavior in well-defined ways.
+We use the name :emph{tuning}:cite{; Kato2016} to refer to this process in the rest of the paper.
+
+
+
+
+
+
+::figure{label=fig:background-code-live}
+  ``{label=line:back:}
+    // input sensor for temperature
+    val temperature = Evt[Double] :§evt§
+    // filter very high and low temperatures an outliers
+    val filtered =
+      temperature.filter(_ <= 100).filter(_  >= -40) :§filter§
+    // build a history of up to 50 temperature values
+    val history: Signal[Seq[Double]] = filtered.last(50) :§last§
+    // an aggregation function that may change over time
+    val aggregation: Var[Seq[Double] => Double] = Var(average) :§var§
+    // apply the aggregation function to the temperatures
+    val aggregated = Signal { :§sig-expr§
+      val f: Seq[Double] => Double = aggregation.value
+      f(history.value)
+    }
+    // select which values to display in the dashboard
+    val onDisplay: Var[List[Signal[Seq[Double]]]] = Var(List(history, aggregated)) :§onDisplay§
+    // assume a generic rendering function for values
+    def render = {
+      case d: Double => ...
+      case l: List[Double] => ...
+    }
+    // render selected signals on the dashboard
+    val dashboard = Signal { :§dashboard§
+      for (item <- onDisplay.value)
+        yield render(item.value)
+    }
+  ``
+  Dashboard application.
+::
+
+# The Chapter’s Running Example
+
+The code in :ref{Figure; fig:background-code-live} implements
+an exemplary application that visualizes sensor data on a dashboard.
+:code{Evt} (:ref{Line; line:back:; line=evt}) serves as an input from an external temperature sensor.
+The temperature event is processed by an operator pipeline (:ref{Lines; line:back:; line=filter}, :ref{line:back:; line=last})
+filtering extreme temperatures (probably sensor faults) and aggregating the last 50 temperatures
+– a signal derived from an event.
+Events and signals may be derived from other events and/or signals
+as long as no cyclic dependencies are formed.
+The aggregation function (:ref{Line; line:back:; line=var}) can change over time,
+i.e., we model it as a signal, which holds the current aggregation function for every point in time.
+More specifically, we model it using a :code{Var}, which is an input “signal” that can be imperatively set.
+The signal expression (:ref{Line; line:back:; line=sig-expr}) applies the (time-changing) aggregation function to the (time-changing) history of temperature events.
+The dashboard (:ref{Line; line:back:; line=dashboard}) then renders all values that should be on display (:ref{Line; line:back:; line=onDisplay}).
+Because the displayed list of values is a signal (a :code{Var} to be precise),
+the concrete displayed items may change, resulting in a dynamic :{flowgraph}.
+
+::figure{label=fig:reactive-inspector}
+  :image{maxwidth=0.6; /Figures/Screenshots/reactive-inspector-without-time-travel-rotated.png}
+  Reactive Inspector user interface.
+::
+
+# Reactive Debugging
+label = sec:debugger-background
+
+Debugging is the process of understanding the behavior of code to resolve bugs.
+Debuggers aid programmers at finding defects
+and help code comprehension by visualizing the application behavior during runtime.
+Traditional debugging tools focus on the analysis of control flow in sequential programs.
+They provide means to interrupt the application at certain points (breakpoints)
+and continue by stepping through each instruction of the program.
+However, debugging based on control flow is ill-suited for :{cvtr},
+because it does not correspond to the :{flowgraph}.
+Therefore, developers often use “printf debugging” to trace the dataflow
+or develop their own ad-hoc visualizations of the :cite{:{flowgraph}; Banken:2018:DDF:3180155.3180156}.
+
+Reactive :cite{debugging; Salvaneschi:2016:DRP:2884781.2884815} is a debugging technique designed to fit the needs of reactive programming.
+Reactive Inspector, a tool that implements this technique,
+provides a set of features similar to those of traditional debuggers but adapts to a dataflow view,
+which is shown in :ref{Figure; fig:reactive-inspector}.
+Reactive Inspector directly visualizes the :{flowgraph}
+and enables navigation through the history of changes
+using history queries and a time slider.
+Reactive Inspector can also pause execution of the current application when selected nodes in the :{flowgraph} are modified,
+similar to breakpoints in sequential debuggers.
+
+## Visualization
+:ref{Figure; fig:reactive-inspector} shows Reactive Inspector – an extension of the Google Chrome debugger.
+Reactive Inspector displays the :{flowgraph} for the dashboard application code presented in :ref{Figure; fig:background-code-live}.
+The main view of the debugger shows the :{flowgraph}.
+Nodes in the :{flowgraph} are named after their corresponding variables in the source code.
+Data flows from left to right, beginning with the temperature event
+and ending at the dashboard signal.
+The view shows the :{flowgraph} directly after it has been created,
+so no temperatures have been recorded yet.
+The highlighted edge (orange) represents the latest modification to the graph
+– the connection between the aggregated value and the dashboard.
+When the graph changes dynamically during program execution, i.e., new nodes or new edges are added, those changes are reflected in the dataflow visualization.
+
+
+## History
+History navigation is similar to stepping through a sequential program,
+but does not pause the execution of the application and works both forward and backwards.
+Applications only store the current state
+– it is normally impossible to inspect past states of the graph –
+hindering understanding of the past behavior of the application leading to the current state.
+Reactive Inspector solves this issue by storing every past state of the :{flowgraph} and providing users with a way
+to visualize the history of the graph.
+The history can be inspected by moving the history navigator slider shown in :ref{Figure; fig:reactive-inspector},
+and points of special interest can be quickly found by issuing a history query.
+History interactions are only visualizations,
+the application is neither modified nor paused – new events are recorded in the future while inspecting the past.
+
+## Breakpoints
+Similar to the breakpoints in traditional debugging tools,
+Reactive Inspector allows users to attach breakpoints to certain graph nodes
+which cause the program to halt when the corresponding node changes its value.
+Breakpoints may be conditional and only trigger on specific values passing through nodes.
+A breakpoint can also be set on the creation or deletion of nodes from the :{flowgraph}.
+When a breakpoint is triggered, Reactive Inspector delegates to the native Chrome debugger to step through the sequential code inside signal expressions.
+
+
+::figure{label=fig:reactive-inspector-modification}
+  :image{maxwidth=0.5; /Figures/Screenshots/reactive-inspector-with-time-travel-rotated.png}
+  Reactive Inspector with extensions to modify the :{flowgraph}.
+::
+
+# From Inspecting to Modifying
+label = sec:modifications
+
+Our paradigm is particularly promising for live programming
+because applications are already designed for interactivity, that is, reacting to external changes.
+For example, the developer might wonder what would happen if a very high (and thus filtered) temperature was measured
+when the history already contained 50 elements.
+:emph{Would this temperature still trigger the update of the history and remove one old element, even though it was filtered?}
+
+Yet, despite the :{flowgraph} is designed for processing dynamic and arbitrary input,
+and updating the application state,
+with the current tools “what if” questions are surprisingly hard to answer.
+Triggering an interesting (high temperature) event at the right point in time (history contains 50 elements)
+requires modifications to the application code to detect the
+desired event pattern and then trigger the event.
+The :{flowgraph} in Reactive Inspector allows one to easily answer such questions.
+We extend this tool to enable direct manipulation of the values in the :{flowgraph}.
+
+
+## Graph Modifications
+
+:ref{Figure; fig:reactive-inspector-modification} shows the extended interface of Reactive Inspector.
+The interface allows changing arbitrary values in the :{flowgraph},
+similar to how interactive debuggers allow changing values assigned to variables.
+However, changing arbitrary variables of an application may cause inconsistencies in the data model.
+Reactive Inspector, on the other hand,
+uses the same mechanism as if the application programmatically changed its input events (:code{Evt}) or signals (:code{Var}).
+Thus, using the :{flowgraph} prevents inconsistencies by
+ensuring that each change is fully processed by the application.
+For example, when the developer issues a new temperature event
+using the “Fire!” button in the left-hand pane of :ref{Figure; fig:reactive-inspector-modification},
+then the new event will be automatically added to the history of events.
+The developer can then easily answer the question above and conclude that
+the event did not change the history – it was filtered.
+
+Exposing the graph through the debugger in such a principled manner allows
+developers to change the code without invalidating basic assumptions of the application.
+For more flexible debugging purposes, however, we also allow developers
+to modify arbitrary signals and events, not just inputs (:code{Var} and :code{Evt}).
+For example, the debugger allows one to directly set the average temperature value,
+even if the new value no longer reflects the current history of temperature events.
+Changes to intermediate values are propagated normally, e.g., the dashboard will be updated with the new average.
+
+
+## Time travel
+A well-known technique of debuggers to modify the state of an application is :cite{time traveling; ElmDebugger},
+i.e., loading a past state of the :{flowgraph}.
+:{rescala} has efficient support for snapshotting the :cite{:{flowgraph}; mogk_et_al:LIPIcs:2018:9206}
+and the debugger can go back to the old state of the application by loading a snapshot.
+This approach enables users not only to inspect the history of an application,
+but also to have the actual application jump back and forth in time to enable user interaction with the application in a specific state.
+Time travel uses the history navigation to select the desired point in time.
+Time travel is especially useful for “what if” scenarios.
+The debugger is able to reset the application to a past state
+– allowing the developer to explore what led to the current state –
+and modify past values.
+Past modifications may change the current application state in the future.
+It is the developer's responsibility not to cause inconsistencies when time traveling.
+
+# Towards a Live Tuning Framework
+label = sec:towards-tuning
+
+Inspection and modifications of the :{flowgraph} is not only useful to developers,
+but also to enable customization – tuning – of the application by domain experts.
+In this section, we envision a live tuning framework built on top of Reactive Inspector.
+
+Domain experts are assumed to have little or no knowledge of application development,
+but may need to comprehend and modify applications that they use.
+For this use case, we consider correctness and ease of tuning more important than full programmability.
+Domain experts should be able to understand, learn from, and adapt examples,
+but without risk of breaking the applications.
+Our goal is to provide limited tuning for most applications out of the box without additional developer effort.
+For additional flexibility, we provide dedicated language abstractions to customize the tuning mechanisms.
+We describe the spectrum of our abstractions for supporting live tuning going from the most simple (ease of use) to the most flexible.
+
+## Tunable Values
+
+The first step is to enable domain experts to modify input signals (:code{Var}) and trigger input events (:code{Evt}).
+Interacting with inputs is considered safe,
+as the :{flowgraph} never has control over external inputs,
+and has to deal with arbitrary values in any case.
+Reactive Inspector ensures that users may only enter values of the correct type
+and provides easy to use UI abstractions for custom values.
+For example, integer inputs are set via sliders, and string inputs with a text box.
+
+However, tuning some inputs may require specifying Scala functions, such as the aggregation function of :ref{Figure; fig:background-code-live}.
+To save domain experts from writing Scala code we allow developers to provide predefined behaviors from which the domain experts select.
+The reactive debugger then displays a drop-down list of possible choices.
+In the example, the developer could provide an average and a sum function,
+as an enumeration of aggregation schemes:
+
+``
+  enum Aggregate(val name: String,
+                 val compute: Seq[Double] => Double) {
+    case Average extends Aggregate("average", ...)
+    case Sum extends Aggregate("sum", ...)
+  }
+``
+
+## Tuning the :{FlowGraph}
+
+We make dynamic changes to the :{flowgraph} available via tuning.
+For example, the application developer may want to allow the domain experts
+to adapt the contents of a dashboard by adding or removing displayed elements.
+The dashboard example supports this use case by allowing the modification of the :code{onDisplay} signal.
+That signal contains a list of other signals and may be tuned to add new signals.
+It is only possible to add reactives with the correct type – this allows the developer to limit which reactives are selectable for dynamic reconfiguration.
+
+## Custom Tuning
+
+At the end of the spectrum for application tuning are solutions defined by the developer.
+For example, developers may want to allow the domain experts to create new elements in the dashboard.
+New elements should be specified using a custom domain-specific language designed for data analysis.
+
+The developer is free to specify how domain experts may interactively tune the application.
+However, it is then also the developer's responsibility to map such tuning mechanisms
+to the underlying :{flowgraph} modifications (e.g., changed nodes, changed code within nodes, changed edges).
+The runtime will still take care of ensuring propagation of updates and keeping the application state consistent.
+We believe that :{cvtr} provides a strong basis for a framework for writing tunable applications,
+where the concrete runtime behavior is interactively developed, e.g., a data analysis application where domain experts can interactively build and combine queries.
+
+# Conclusion
+We have shown that :{cvtr} facilitates writing of tunable live applications.
+The abstractions are suitable for both writing source code
+and representing code visually to interactively inspect, change, and evolve the behavior of an application.
+The presented approach to modify values in the graph is an initial step towards making the graph more tunable through live modifications.
+Augmenting :{cvtr} with abstractions specific for tuning allows for safe runtime modifications also by non-expert developers.
+In perspective, we want to support and to be able to mix both forms of
+traditional development (compiling and re-executing) and live development (changing code during runtime),
+so developers can freely choose to what degree they use which approach to solve specific problems during the development process.
+Refer to :ref{Section; section-tuning-related} for related approaches.
+
+Especially in the area of distributed executions it is an exciting future extension to get an overview over a distributed :{flowgraph}.
+Such an overview is by necessity not always consistent with the actual state of the system, but using :{cvtr} allows an eventually consistent view that also would enable eventually consistent tuning options, thus allowing system operators to tune their distributed systems easily.
+

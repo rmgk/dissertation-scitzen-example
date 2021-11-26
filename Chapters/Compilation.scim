@@ -1,0 +1,241 @@
+== Compiling :{cvtr} for Embedded Devices
+label = chapter-compilation
+
+This chapter explores how to deploy the core of :{fr} to embedded devices with very limited resources.
+Typical :{apps} we consider in the rest of this thesis are associated with devices with powerful processors and plenty of main memory (this includes smartphones).
+However, because of the distributed nature of :{apps} it is useful to consider executing parts of the application on embedded devices.
+In this chapter, we consider the example of executing on a specialized processor embedded in all smartphones – the Wi-Fi chip.
+As a platform, the Wi-Fi chip has very limited capability of executing generic :{apps}, but the Wi-Fi chip has efficient access to special resources – Wi-Fi packets and channel connection information.
+Accessing those special resources from the processor of the host device is often expensive, because the amount of data that can be transferred efficiently is limited and on mobile devices it is desirable to not activate the main CPU to conserve energy.
+Thus, there is considerable advantage of executing code directly on the Wi-Fi chip.
+For a similar reason, it is desirable to execute parts of a distributed application on other embedded devices such as networked sensing devices with limited bandwidth where aggregating and filtering data on the device saves costly communication.
+
+In our prior work:cite{; Sterz2020ReacfiFi} we explored a purely reactive paradigm for Wi-Fi chips without distribution, interactivity, or connectivity.
+But ultimately, the goal is to develop a single application using our programming paradigm :{cvtr} that accesses special resources as if they were available to the local device.
+The compiler or runtime should automatically split the :{flowgraph} to produce the most efficient deployment.
+While doing this automatically is left for future work, in this chapter we show that the programming model of :{cvtr} is very well suited for the development of embedded hardware.
+We provide a compilation strategy for :{fr} programs that removes all dynamic overhead typically associated with the :{flowgraph}.
+We present a compiler that compiles a :{flowgraph} into sequential code that fits the execution model of sequential embedded processors.
+The only drawback for the programming model is that the ability to dynamically reconfigure the :{flowgraph} is lost – a property that is important to :{apps} but not necessary for the parts of the application that should be offloaded to embedded devices.
+
+
+# Compilation Overview
+
+To compile the :{flowgraph} it must be static.
+Static means that no dynamic edges between reactives are allowed, i.e., the :code{flatten} method cannot be supported.
+There may be no use of the :code{fire} and :code{value} methods during the creation of the :{flowgraph}, because it is impossible to interact with values during compilation.
+Thus, all integrations must happen using the sources and observers that are understood by the compiler.
+We call this reduced subset of the calculus :{reactifi} – named after the first target platform of that language (the Wi-Fi chip).
+:{reactifi} uses the C programming language for user-defined functions, but uses the actual calculus for the embedding language – in contrast, :{rescala} uses Scala for both the embedding and for user-defined functions.
+
+::figure{label=fig:compilation-stages}
+  :image{/Figures/System/reactifi-pipeline.pdf}
+
+  Stages of compiling :{reactifi} to Wi-Fi chips.
+::
+
+A :{reactifi} program is processed in four steps (:ref{Figure; fig:compilation-stages}): (i) an interpreter executes the :{reactifi} program to construct the :{flowgraph}, (ii) the compiler compiles the :{flowgraph} into a C program that represents a sequential execution of the change propagation discussed in :ref{Chapter; chapter-programming_model}, (iii) the C source code is compiled into a binary, which (iv) is loaded to the Wi-Fi chip and linked into the firmware at runtime.
+Constructing the :{flowgraph} is very similar to the semantics described in :ref{Chapter; chapter-programming_model}.
+In this chapter, we are interested in the second step: compiling the :{flowgraph} to C code.
+
+Once constructed, the :{flowgraph} is analyzed to extract the following information that is passed to the subsequent processing phases: a topological order of all reactives, a set of conditions guarding the activation of each reactive, and types and memory requirements of reactives in the :{flowgraph}.
+Given this information and the C code of the function bodies embedded into reactive definitions, the :{reactifi} compiler generates a single sequential update function in C, which implements the reaction to external events.
+
+
+To simplify the presentation of the compilation process we first discuss a simplified procedure where :{reactifi} programs are compiled line-by-line into C programs, without any global transformations based on the information in the :{flowgraph}.
+This compilation procedure produces semantically correct code, but without global optimizations.
+We then discuss those optimizations separately in :ref{Section; section-generating-c_code}.
+
+
+
+# Compiling Individual Reactives
+
+::figure{label=fig-compiler-semantics}
+  ``{converter=tex; template=/templates/formalism.scim}
+    \begin{document}
+    \begin{align*}
+    \compile{\vx{} \react{\overline{x}}{f}} =&
+    \ccond{\trigger{\overline{x}}} {x_0 = \compile{f(\overline{x})}}
+    \\
+    \compile{\vx{} \fold{x}{v}{f}} =&
+    \ccond{\trigger{x}} {x_0 = \compile{f(x_0, x)}}
+    \\
+    % \compile{\vx{} \foldn{}(v)(x \rightarrow f)} =&
+    % \ccond{\trigger{x}} {x_0 = \compile{f(x_0, x)}}
+    % \\
+    % \compile{\vx{} \foldn{}(v)(x_1 \rightarrow f_1, \overline{x \rightarrow f})} =&
+    % \ccond{\trigger{x_1}} {x_0 = \compile{f_1(x_0, x_1)}};
+    % \\& \compile{\vx{} \foldn{}(v)(\overline{x \rightarrow f})}
+    % \\
+    \compile{\vx{} \filter{x}{f}} =&
+    \ccond{ \trigger{x} \&\& \compile{f(x)} } {x_{0f} = \sigact{}; x_0 = \compile{x}}
+    \\
+    \compile{\vx{} \evt{s}} =&
+    \ccond{\trigger{s}} {x_0 = \compile{s}}
+    \\
+    \compile{\vx{} \compile{\observe{\overline{x}}{o}}} =&
+    \ccond{\trigger{\overline{x}}} {\compile{o(\overline{x})}}
+    \\
+    \compile{\vx{} \ror{x_1}{x_2}} =&
+    \ccond{ \trigger{x_1}} {x_0 = \compile{x_1}}
+    \\& \celse{\ccond{\trigger{x_2}} {x_0 = \compile{x_2}} }
+    \\
+    \compile{\vx{} \snapshot{x_1}{x_2}} =&
+    \ccond{\trigger{x_1}} {x_0 = \compile{x_2}}
+    \end{align*}
+    \end{document}
+  ``
+  Compiling individual :{reactifi} reactives (left) to C code (right).
+::
+
+
+To simplify the presentation of the compiler we show how each individual reactive is compiled when in single static assignment form, i.e., the code is a sequence of definitions in the form :math{"\vx{} t"} where :math{t} is a term that creates a reactive, source, or observer.
+In addition, we assume the program code does not contain any function calls on the top level.
+Thus, the top level program consists only of the assignments of names to reactive definitions.
+The overall compilation process then applies the transformations of individual reactives to the sequence of statements in the program.
+This representation is exactly capable of representing all static and :{flowgraph}s.
+:ref{Figure; fig-compiler-semantics} shows how each of the assignments for all the different reactive definitions are compiled into C-like statements.
+
+Compilation from :{reactifi} to C is written :math{"\compile{\vx{} r}"}.
+The result of compiling a reactive is generally in the form “:math{"\ccond{\trigger{\overline{x}}} {x_0 = \compile{f}}"}” where :math{"\trigger{\overline{x}}"} computes when the reactive activates.
+If it does activate, the state :math{x₀} of that reactive is updated.
+Again, for ease of presentation each statement is compiled individually and the produced code is conceptually executed in the order of the :{reactifi} program.
+The order of statements in the :{reactifi} program corresponds to the topological order of the :{flowgraph} because the code does not allow forward references.
+However, in reality, the :{reactifi} program is first executed to extract the :{flowgraph} (c.f., :ref{Figure; fig:compilation-stages} and the compiler then groups the execution of related statements for efficiency as discussed later.
+
+For the line-by-line compiled code, each statement first checks if the activation condition (e.g., :math{"\trigger{\overline{x}}"}) for its inputs (e.g., :math{"\overline{x}"}) are fulfilled, and only then updates the current value of the reactive (:math{x_0}).
+In contrast to :{fr} only source reactives and filter reactives have their activation tracked at runtime, because we want to minimize the amount of used memory for propagation.
+All other reactives compute their activation based on their transitive dependencies.
+Each reactive activates exactly if one of their inputs activates, but the same holds true for the inputs.
+Thus, to know if a reactive :math{r} activates in a given propagation, we only need to compute if any of the transitive sources or filters that :math{r} depends on activates.
+We discuss in :ref{Section; section-generating-c_code} how we optimize these checks, so they do not need to occur for every single reactive.
+
+Due to the memory constraints, :{reactifi} primarily uses event semantics for its reactives, i.e., the state of reactives is not stored between propagations.
+The only exception are sources which have their state available directly in the firmware of the Wi-Fi chip and fold reactives which do store state.
+Compilation is shown in :ref{Figure; fig-compiler-semantics}.
+All reactives are directly compiled into assignments of new values to their storage location.
+The interesting exceptions are filter reactives, which in addition to assigning the value of their input without change also set their filter activation :math{"x_{0f}"} to true.
+Source reactives are underspecified and their activation and value is dependent on whatever the runtime of the Wi-Fi chip can support.
+There are no user-defined sources in :{reactifi}.
+The same is true for observers, which may only execute pre-defined effects known to the compiler and runtime.
+Due to :{reactifi} having only simplified event semantics except for folds, we show two more reactive methods that are not present in the core of :{fr}.
+These are choice reactives :math{"\ror{x_1}{x_2}"} and snapshot reactives.
+Choice reactives have two different activation conditions depending on either one or the other input, but not both, and their value is the value of whichever input activates (the first one if both activate).
+Choice is not a primitive operation for :{rescala}, because the value of events is wrapped in an optional data type – thus it can be safely accessed and tested for presence.
+In contrast, in :{reactifi} the value may only be accessed if the reactive activates otherwise the program would read uninitialized memory.
+The snapshot method is required to access the state of a fold reactive when another reactive activates.
+This access is safe because the state of folds is always available.
+The type system of :{reactifi} distinguishes between fold reactives and other reactives and only allows folds to be used for the snapshot method.
+The compilation of snapshot checks one input for activation and uses the value of the second input.
+
+Compiling constructs other than reactives works as expected.
+Compiling functions :math{"\compile{f(\overline{x})}"} result in a call to a fresh top-level function definition where the body of the function is kept as is – note that user-defined functions are already written in C.
+Compiling an :emph{identifier} that binds a reactive :math{"\compile{x}"} produces code that accesses the value of that reactive.
+
+
+
+# Optimizations Using the :{FlowGraph}
+label = section-generating-c_code
+
+Line-by-line compilation produces a conceptually correct program, but using the :{flowgraph} to optimize the code that reacts to individual sources allows for efficient execution on the limited target platform.
+Especially, we are interested in minimizing the time spend in each single update propagation process, because any latency may cause dropped Wi-Fi packets.
+We are also interested in minimizing memory consumption because there is only very limited memory available.
+
+## Static Sequential Scheduling
+The :{flowgraph} specifies a logically concurrent execution order of reactives in response to individual external events; moreover, only a subset of reactives is typically activated for each external event.
+Wi-Fi chips only support sequential execution and network applications are latency-sensitive.
+To address these constraints, the compiler sequentializes the order of updating reactives, produces optimized per source update logic, and generates a minimum number of conditional branches to select the updated reactives.
+
+A topological traversal of the :{flowgraph} is used to compute the sequential execution order of reactives.
+However, while the relative execution order of reactives can be statically fixed according to the topological order, whether and when reactives activate depends on runtime conditions.
+In particular, for many source reacitves it is statically known which of them may occur at the same time and which will always occur at logically distinct times, e.g., packets are processed sequentially by the Wi-Fi chip even if physically occurring at the same time.
+Thus, the compiler generates one update function per set of sources that may occur together.
+In the typical case this results in each source having a single concise update function that quickly updates the relevant state.
+All update functions share the same global set of state stored in fold reactives.
+
+When multiple sources may occur at the same time, or in :{flowgraph}s with complex filter conditions and multiple paths, we do not want to check the activation conditions for each individual reactive.
+Instead, reactives are grouped into uninterrupted pipelines based on shared filtering conditions.
+The compiled update function only checks conditions once per group.
+Sources and filter reactives define new conditions.
+For all other reactives, the conditions are derived from the conditions of their input reactives.
+The choice and fold all reactives use the disjunction of the conditions of all inputs.
+All other reactives use the conjunction of the conditions of all inputs.
+For illustration, consider the :{flowgraph} of a case study in :ref{Figure; fig:dataflow-filter-grouping}.
+The case study is detailed in prior work:cite{; Sterz2020ReacfiFi}, but we are only interested in the structure of the :{flowgraph}.
+There is a single source: :code{Monitor} but multiple filter and choice reactives that change the activation condition.
+The blue boxes mark the groups of reactives with the same activation conditions.
+For instance, the rightmost group will execute only if the :code{Monitor} source fires, the condition for the :code{frames} filter holds, and either :code{fromSource} or :code{fromAP} filter functions are true.
+Thus, the generated update function for the :code{Monitor} source will only check the activation conditions four times, once for each group – except for the source group which does not need to be checked.
+When there are multiple sources, then also the source groups need to check if that source activates or not.
+
+::figure{label=fig:dataflow-filter-grouping}
+  :image{/Figures/Graphs/filesharing.pdf}
+  The :{flowgraph} of the adaptive file sharing case study.
+::
+
+
+## Optimized Memory Management
+label = sub:memory
+
+Wi-Fi chips have limited memory.
+For instance, the memory built into the Nexus 5 has 768kB RAM, most of which is used by the basic firmware, with only as little as 100kB RAM left for higher-level functionality; to put this into context, a single IP packet is up to 2kB in size.
+Reactives are abstractions with zero runtime memory cost, i.e., the only memory requirements at runtime are those of the contained values and only when the values are in use.
+To facilitate compile-time estimation of the needed memory, :{reactifi} allows only fixed size types :math{"\type{T}"} to be used in code.
+Memory for reactives is reclaimed at the earliest time possible.
+Technically, to find the reclamation point of a reactive :math{r_1}, the compiler traverses the sequential execution order from the back to find the last reactive :math{r_2} that depends on :math{r_1}.
+The scope of :math{r_1} extends from :math{r_1} until after :math{r_2}.
+Unlike other reactives, the state of folds is stored between updates, thus never reclaimed.
+Overall, for each reactive :math{r}, the compiler knows how much memory is already allocated when a new value will be computed for :math{r}.
+This is the sum of the memory allocated to all folds in the program plus the sum of the memory allocated to all non-fold reactives in scope.
+This way, the compiler is able to maximize the memory available for executing the function bodies embedded in the reactives.
+
+# Exemplary Compilation
+For illustration, consider the code below, defining a map reactive (:code{address}) with two inputs, :code{frame} and :code{subframe}; we assume that both frames are derived from a :code{Monitor} source (not shown for brevity).
+
+``
+  val address = (frame, subframe).map((fr, sub) => { /* extractAddress */ } )
+``
+
+The generated C code is sketched in :ref{Figure; lst:compiler-output}.
+Since there are no folds, the program has only local state.
+The user-defined function is extracted to a top-level C function :code{extractAddress}.
+Within the :code{update} function, first, the variables for the source conditions  (:code{monitor_condition}), the values computed for the input reactives (:code{frame_value}, :code{subframe_value}), and for the map reactive (:code{address_value}) are declared.
+Then, the activation conditions of sources are computed, followed by the guarded execution of reactives, when the sources are activated.
+The code illustrates the two compiler optimizations.
+First, the activation condition is only checked once for all reactives as opposed to once per reactive.
+Second, the values :code{frame} and :code{subframe}
+are deallocated immediately after they are used and no longer needed.
+We assume that :code{address_value} is used later in the program, otherwise the whole program would be optimized away.
+
+::figure{label=lst:compiler-output}
+  ``{language=C}
+    address_t extractAddress(frame_t fr, frame_t sub) { /* extractAddress */ }
+    // state of fold reactives would be above
+    void update() {
+        bool monitor_condition;
+        frame_t frame_value;
+        frame_t subframe_value;
+        address_t address_value;
+
+        monitor_condition = runtime_is_triggered(Monitor)
+        if (monitor_condition) {
+            frame_value = ...;
+            subframe_value = ...;
+            address_value = extractAddress(frame_value, subframe_value);
+            deallocate(frame_value);
+            deallocate(subframe_value);
+        }
+    }
+  ``
+  Generated C code example.
+::
+
+
+# Conclusion
+
+This chapter shows how the :{cvtr} programming paradigm can be implemented by compilation to sequential code suitable for embedded devices.
+We believe this to be a significant demonstration of the utility of the programming paradigm, because embedded devices are at the opposing end of the spectrum of platforms that :{apps} are typically executed on.
+:{rescala} was designed for the JVM – with large heaps and fast JIT compilation.
+Thus, it is delightful that the same programming paradigm is usable on small embedded devices – even though we have to restrict the compilation to static :{flowgraph}s.
+Our hope for the future is, that we can use the same domain specific language to describe the :{flowgraph} for an application that is distributed on embedded devices and desktop devices and have communication be automated.
+

@@ -1,0 +1,273 @@
+== CRDTs and :{cvtr}
+label = chapter-crdts
+
+When we introduced replication and causal consistency in Part I of this thesis we opted for a modular integration of CRDTs and reactives.
+Replicated reactives in :{fr} only assume the existence of an associative, commutative, and idempotent merge function.
+The implementation in :{rescala} follows the same principles – the difference between a normal reactive and a replicated reactive is that the latter has an implementation of the merge function (c.f., :ref{Figure; fig-project-lattice_interface}).
+The modular integration fits the fine-grained proofs in our operational semantics, because it only adds a minimal amount of cases to consider for the integration.
+For example, our proofs for optimal concurrency and transactional isolation are completely independent of the replication.
+Due to the same reason, the replication strategy could be extended or exchanged, as long as the result still adheres to the properties of the merge function.
+For example, it would be possible to exchange state-based CRDTs with the :cite{global sequence protocol; Burckhardt2015}.
+The implementation also benefits from the same flexibility.
+
+In this chapter we informally explore what a tighter integration of CRDTs and :{cvtr} entails.
+The discussions in this chapter explains the existing properties on a different level of abstraction, and shows that there is a logical equivalence between our synchronization algorithm used for causal consistency of the :{flowgraph} and the general concept of synchronization of CRDTs in the literature.
+We hope that the discussion provides a better understanding of the consequences of the :{cvtr} programming paradigm regarding replication and that it may serve other similar systems as guidance or inspiration.
+Furthermore, the new perspective allows us to use existing research on CRDTs and directly apply the concepts to find solutions for challenges in :{cvtr}.
+
+We first discuss challenges for application design caused by the restrictions on operations of CRDTs.
+Then, we give an intuition of the benefits of :{cvtr} for the application design compared to a design using CRDTs without :{cvtr}.
+Specifically, this intuition states that the :{flowgraph} itself can be seen as a single complex CRDT, thus giving a high-level correspondence between these two parts of :{cvtr}.
+We also discuss a general strategy to represent all :{cvtr} applications as CRDTs independent of the usual restrictions placed on CRDT operations.
+Finally, use this correspondence to discuss two extensions to :{cvtr}.
+The extensions include performance improvements based on delta replication for CRDTs, and the integration of strong consistency into :{cvtr} with an implementation of the Raft consensus algorithm.
+
+
+
+
+# CRDTs and their Challenges for Application Design
+label = section-crdts-disambiguation
+
+Every CRDT has a state, and a collection of operations – an API – that change that state.
+CRDTs can be roughly categorized as operation-based or state-based, depending on the properties a CRDT requires of its state and operations.
+The challenges on application design using CRDTs stems from these restrictions, which we discuss in the following.
+
+While :{cvtr} generally makes use of state-based CRDTs – because they impose the least restrictions for our purposes – we will first discuss operation-based CRDTs.
+We then discuss the monotonicity requirement of operations on state-based CRDTs.
+Finally, we discuss the composition of multiple CRDTs, that is, how to support operations that change multiple CRDTs at the same time.
+
+
+
+## Operation-based CRDTs
+
+Operation-based CRDTs:cite{; Shapiro2011} achieve consistency by synchronizing the set of applied operations.
+The current state is reconstructed by applying the operations.
+The network runtime would have to ensure that operations are applied exactly once and in the correct order to ensure consistency (the global sequence protocol:cite{; Burckhardt2015} is based on that strategy).
+If the network runtime cannot guarantee order, operation-based CRDTs require that the order in which operations are applied does not matter, i.e., all pairs of operations are commutative.
+If the network cannot guarantee that operations are applied only once, operation-based CRDTs require that operations are idempotent.
+The only way to achieve causality is for the network to ensure that operations are applied in causal order.
+
+The advantage of operation-based CRDTs compared to state-based ones is that – with commutative and idempotent operations – it is sufficient to individually send the executed operations.
+There is no need to send the complete state.
+Commutativity and idempotence of operations has implications for application design – it becomes harder to design new operations.
+For example, to support a new operation for an operation-based CRDT it must be ensured that the new operation is commutative with all other operations, thus it is no longer possible to design operations independently.
+In conclusion, we believe that the simpler conceptual design and higher flexibility of state-based CRDTs makes them a better fit when integrating CRDTs into the application logic.
+Thus, we only consider state-based CRDTs for :{cvtr}.
+
+
+## State-based CRDTs and Monotonicity
+
+:{cvtr} makes use of state-based CRDTs – or, more precisely, the properties of algebraic lattices.
+A lattice is a partial order :math{≤} on states, where every two states :math{σ₁} and :math{σ₂} have a unique least upper bound :math{"σ_{1,2} ≤ \mmerge(σ₁, σ₂)"}.
+State-based CRDTs cannot support operations that decrease their state according to the lattice order.
+Consider when an operation is applied to state :math{σ} and the result :math{σ_r} is smaller :math{σ_r ≤ σ}.
+Then, merging the two states is equal to the original state :math{\mmerge(σ, σ_r) = σ}, that is, the intended effect of the operation is lost.
+Thus, each operation on a lattice must be “monotonic”, i.e., must take effect by only increasing the state.
+
+
+Monotonicity has an implication on the design of applications and their data structures.
+For example, to implement a counter it is no longer sufficient to increment or decrement an integer register.
+Instead, a state-based CRDT counter records an individual count for each replica – with the sum of all counts reflecting the original counter.
+The inherent problem here is that the lattice structure of the state of a CRDT must be designed to support its operations.
+Supporting many or generic operations causes the state to become more complex.
+Thus, it is often infeasible to support CRDTs that are as general as traditional data structures.
+
+However, it is in practice evident that finding a monotonic implementation of a single operation by combining other monotonic operations is not any harder than traditional application development.
+Thus, it becomes very desirable to design CRDTs as part of the application and specifically to only support operations required by that application, which sidesteps the issue of having to design big APIs of many monotonic operations.
+
+## Composing State-based CRDTs
+
+Composing two CRDTs is usually understood as having an operation that changes both CRDTs, while extending the guarantees of individual CRDTs to the composition.
+For example, consider two integer counters representing two bank accounts and a composed operation that transfers money by increasing one counter and decreasing the other counter.
+All devices should observe the two changes “at the same time” (as an atomic operation) to ensure that a transfer of money does not change the total balance – not even temporarily.
+Essentially, we need a form of “transactions” (different from :{cvtr} transactions) over CRDTs.
+
+With traditional CRDTs, the way to achieve this is to combine all involved CRDTs into a single one during the design of the application.
+For state-based CRDTs this composition can be achieved systematically, by arranging two or more individual lattices into a single structure.
+Each operation and the merging of states then operates on the corresponding component of the structure.
+New operations affecting multiple components can then be added.
+
+However, the application has to use the combined CRDT in all places instead of the individual smaller CRDTs.
+For example, an application can no longer operate on a single bank account, but must operate on the composed CRDT that represents all bank accounts that may have transactions between them.
+Since most applications have pairwise interactions between many of their components, the end result tends to be that all CRDTs of the application have to be composed into a single CRDT as indicated in :ref{Figure; fig:crdt-composition}.
+Thus – because this large CRDT is then used by all parts of the application – modularity is lost:cite{; Alvaro2013ConsistencyBorders}.
+
+::figure{label=fig:crdt-composition}
+  :image{/Figures/System/composeTraditional.pdf}
+  Composing multiple CRDTs in a traditional application results in a single monolithic CRDT, thus losing modularity.
+::
+
+
+# How :{cvtr} Fosters Modular Composition
+
+::figure{label=fig:dataflow-graph-composes-crdt}
+  :image{/Figures/System/composeREScala.pdf}
+  A :{flowgraph} provides modularity and transactions for multiple CRDTs.
+::
+
+We have shown how :{cvtr} provides causal consistency for multiple CRDTs in :ref{Section; section-dataflow_causal_consistency}.
+Causal consistency is ensured by synchronizing all replicated reacives when two devices communicate (as opposed to just the reactives present on both devices) to ensure that all causal relationsships are preserved even in a dynamic network with multiple hop communication.
+Thus, the ensured correctness guarantees and the required amount of synchronization of :{cvtr} are the same as if the application was using a single monolithic CRDT composed out of the state of all replicated reactives.
+This correspondence between :{cvtr} and a monolithic CRDT is not by chance.
+As we discuss next, there is a representation of the :{flowgraph} as a single CRDT.
+Because the application design is not affected by this representation, :{cvtr} provides transactions over CRDTs without sacrificing modularity.
+
+In :ref{Chapter; chapter-programming_model}, we represent the state of an application as a store :math{μ: r ↦ v} that maps reactives :math{r} to their values :math{v} (simplified view, the actual store contains more information that is not relevant here).
+Each replicated reactive has a merge function in a global map :math{M: r ↦ \mmerge}.
+Thus, the store – more precisely, the part of it consisting of replicated reactives – maps each reactive to a state that is part of a lattice (i.e., the state has a merge function).
+From this it follows that the store :math{μ} itself is a lattice, because we can construct a merge function :math{"\mmerge(μ₁, μ₂) = \{M(r)(μ₁(r), μ₂(r)) | r \in dom(M) \}"} that merges two stores by merging each reactive using its individual merge function.
+Because we have shown that the store forms a lattice, a transaction in :{cvtr} then corresponds to a single operation on the store CRDT that changes the state form one store to another (larger) store.
+
+
+:ref{Figure; fig:dataflow-graph-composes-crdt} shows that CRDTs embedded into the :{flowgraph} remain independent, but are connected as part of reactives in the :{flowgraph}.
+Reactives may be published by modules and consumed in other modules, without losing independence between modules.
+Changes to reactives in different modules are orchestrated by transactions without the need to modify the design of the application.
+Thus, it is not necessary for developers to manually design new operations and fit them all into a single CRDT – the transactions provide those operations as needed.
+Furthermore, because each individual CRDT in :{cvtr} serves only a very specific purpose in the application (as the state of a single reactive), it is sufficient if each CRDT implements the minimal set of operations required for that reactive.
+Supporting only few operations allows the implementation of the CRDT to be as simple as possible.
+
+Moreover, all :{cvtr} applications have a regular structure when automatically represented as a CRDT – while the structure of a manually designed monolithic CRDT depends on the application.
+Thus, the implementation can make use of the known structure to apply optimizations in certain network topologies (e.g., client-server model, or a peer-to-peer model).
+It is even possible to dynamically forfeit causal consistency for better performance without changing the application code.
+
+One may argue that our solution already presumes the use of a different programming paradigm.
+However, this is not a limitation.
+On the contrary, previous studies have shown that designing applications in a dataflow style improves program comprehension thus reducing errors:cite{; Salvaneschi2017empirical}.
+In addition, our case studies (:ref{Chapter; chapter-case_studies}) demonstrate that the programming model is suitable to implement the kind of applications we are interested in, which is still unclear for designing :{apps} as CRDTs.
+
+In conclusion, synchronization in :{cvtr} corresponds synchronization of a single CRDT.
+We believe that this correspondence will allow us carry over theoretical results of (state-based) CRDTs to :{cvtr} in future work.
+The rest of this chapter explores preliminary ideas we gain from this correspondence.
+
+
+# How :{cvtr} Fosters Monotonic Operations
+label = section-crdts-transactions-are-monotonic
+
+Here, we discuss how any transactional system, including :{cvtr}, relates to a lattice with only monotonic operations.
+In other words, an alternative view of the relation between transactional systems and CRDTs.
+
+To design a (state-based) CRDT, it is necessary to design monotonic operations, i.e., operations that only increase the “size” of the state according to the partial order of the underlying lattice.
+The state of transactional systems lends itself to a natural monotonic representation: a log of transactions.
+As discussed, every local transaction on the :{flowgraph} can be seen as a single operation on a structure resembling a composed CRDT.
+However, because transactions in :{cvtr} are deterministic (c.f. :ref{Section; section-formalism-determinism}) and executed in serial order (or at least in serializable order for real implementations), there is an alternative representation of the state of the :{flowgraph} where only the local transactions and their serial order are replicated.
+Due to the determinism of applying transactions to the :{flowgraph} a globally consistent state of the :{flowgraph} can be restored on each device by applying the transactions in the serialization order.
+Thus, no longer requiring the synchronization of state.
+In particular, no longer requiring operations on that state to be monotonic.
+The overall concept is similar to what many databases use for fault tolerance.
+
+Using the transaction order for replications allows arbitrary – non-monotonic – operations instead of requiring CRDTs as the state of reactives.
+However, the issue with this approach is that a device that is working offline may create transactions very early in the global serialization order.
+As soon as that device synchronizes with other devices all the other devices must revert their state to the state of the earlier transaction and then re-execute all transactions that happened after.
+The :cite{global sequence protocol; Burckhardt2015} shows how a system that reverts state in case of late messages can be made efficient when using a central server to ensure that only a limited amount of program history must be recomputed.
+
+The advantage of using the transaction log for replication lies in the theoretical implication: causal consistency is possible for every :{cvtr} program.
+The only limitation are efficient implementations for important special cases.
+However, while this theoretically means that :{cvtr} allows using non-monotonic operations for replicated data, none of our case studies has ever shown a need to do so.
+The ability to compose simple CRDTs in multiple reactives proves to be flexible enough for program development.
+Derived reactives in :{cvtr} may use non-monotonic operations in any case, reducing the need for more complex CRDTs.
+Thus, using CRDTs as the state of the replicated reactives remains the more practical choice.
+
+
+
+
+# Profiting from the Correspondence Between CRDTs and :{cvtr}
+
+In the following, we discuss two topic topics where we gain new insights based on an overlap of research between CRDTs and :{cvtr}.
+First, we discuss how research on delta CRDTs may improve performance for replication in :{cvtr}.
+Second, we implement the Raft consensus algorithm as a CRDT, thus providing applications a choice to use strong consistency if needed.
+
+## Addressing the Cost of Causality with Delta Replication
+label = section-crdts-delta_replication
+
+::figure{label=figure-crdts-workflow}
+  :image{maxwidth=0.8; /Figures/System/crdt-workflow.pdf}
+  Visualization of a workflow with data at different devices.
+::
+
+:ref{Figure; figure-crdts-workflow} visualizes the following example of a distributed workflow that spans multiple users and devices.
+A user uploads a video, which is re-encoded by a server for multiple resolutions, simultaneously reviewed by a moderator, and published on a website after review and encoding.
+In a workflow like this it is unreasonable to expect all devices to replicate all work, for example, encoding on a smartphone is a bad idea, while servers cannot execute processing steps that require human interactions (such as reviewing).
+In :ref{Figure; figure-crdts-workflow}, the work done on each device is represented by downward arrows and replication by horizontal lines.
+As we can see, parts of the workflow exist on different devices, yet the overall workflow represents a single application with state and consistency requirements distributed across devices.
+
+When proving causal consistency for :{fr} in :ref{Section; section-dataflow_causal_consistency} we show that it is required to synchronize the state of all replicated reactives at the same time.
+In the workflow example in :ref{Figure; figure-crdts-workflow}, this would amount to all boxes to be present on all devices.
+Moreover, state-based CRDTs usually require to send their complete state for synchronization – thus performance of the workflow example would suffer from a lot of unnecessary replication.
+To address this problem, :{rescala} only synchronizes a replicated reactive, if both devices include the reactive in their :{flowgraph}.
+For example, the re-encoded video is not replicated back to the user doing the upload.
+
+::figure{label=figure-crdts-loss_of_causality}
+  :image{maxwidth=0.6; /Figures/System/crdt-loss-of-causality.pdf}
+  Loss of causality when transactions are split and later recombined.
+::
+
+However, doing so naively breaks causal consistency in certain network topologies (those where there are multiple communication paths between two devices).
+As an example, consider :ref{Figure; figure-crdts-loss_of_causality} where the same four devices from our workflow example operate on two replicated reactives A and B.
+Only the devices next to each other can communicate.
+The User device creates a transaction T₁ that changes both A and B.
+Because the Processing device only knows reactive A and the Moderator device only reactive B, the connection between the changes is lost when replicating the individual state, thus creating separate transactions T₂ and T₃.
+Applying T₂ and T₃ on the Web device as separate transactions means that the original guarantees of T₁ are violated.
+It is possible to have causal consistency even when only partially replicating state by detecting such split transactions, but reasoning about such issues at the level of update propagations over individual replicated reactives turns out to be very unintuitive – the issues we care about are hidden between too many technical details.
+Instead of using our own solution, we believe that it should be possible to apply results about causally consistent delta replication for CRDTs:cite{; Almeida2018DSR}.
+
+A delta CRDT is a form of state-based CRDT, where each operation only returns its delta to the current state.
+A delta is a (small) state that, when merged with the current state of the CRDT, produces the full result of the operation.
+More precisely, for normal CRDTs, the sequence of states :math{σ} of a single replica of the CRDT is monotonically increasing :math{σ₁ ≤ σ₂ ≤ … ≤ σ_n}.
+Delta CRDTs, instead produce an ordered sequence of deltas :math{δ₁, δ₂, …, δ_n} on each replica.
+The sum of the first :math{i} deltas is equal to :math{σ_i}, in other words, :math{"δ₁ = σ₁; \mmerge(δ₁, δ₂) = σ₂; …"} or generally :math{\mmerge(δ₁, …, δ_i) = σ_i}.
+Note, all these operations represent the behavior of a CRDT at a single device, that is, all states and deltas above are implicitly scoped to one single device.
+Replication of delta CRDTs then only requires to transfer those deltas that are necessary and not yet available on another device, similar to our goal of only replicating the reactives a particular device is interested in.
+
+The interesting part for us is that replication of delta CRDTs also suffers from loss of causality if used naively.
+State-based CRDTs normally guarantee causality because each state “includes” all smaller states.
+However, when deltas are merged and one of the deltas is missing (e.g., merging only :math{\mmerge(δ₁ + δ₃) = σ₁₃}) then a state :math{σ₁₃} is computed that is not part of the total order of the original device.
+While consistency is restored when the missing delta is merged, the introduction of unordered states is exactly why causality is lost (e.g., :math{σ₁₃} may depend on results caused by changes in :math{δ₂} without including that delta).
+
+To guarantee causality, any remote device must merge deltas in the order they were produced by the origin device.
+This can be achieved in multiple ways, depending on the network conditions.
+The simplest solution is to use a transport protocol that ensures message ordering, such as TCP without disconnects.
+However, as a more interesting solution for our purposes, the metadata in CRDTs can be used to detect state that can safely be merged:cite{; Almeida2018DSR}.
+The same mechanism can be used to ensure that two deltas that originate from the same transaction are applied as a single transaction on each receiving device, independently of the path of the deltas through the network.
+
+While research on delta CRDTs may improve replication in :{cvtr}, our results should give an insight on how to compose delta CRDTs into larger CRDTs, which has not yet been sufficiently studied.
+Usually delta CRDTs store metadata about ordering of deltas for each CRDT without the possibility to combine those of multiple CRDTs.
+However, with :{cvtr} this metadata would be stored for each transaction, thus using the same metadata to apply delta messages of multiple CRDTs in a causally consistent order.
+This would also enable the use of delta CRDTs for individual reactives at no or little additional cost.
+
+
+## Paxos Made Eventually Consistent
+label = sec-paxos_as_crdt
+
+The :{cvtr} paradigm is limited to causal consistency.
+However, :{apps} can implement strong consistency as an application-level protocol.
+To demonstrate what that means, we have implemented the Raft algorithm as a CRDT in :{rescala}.
+:cite{Raft; DBLP:conf/usenix/OngaroO14} is a simplified version of the :cite{Paxos; lamport2001paxos} algorithm (the simplified explanation of Paxos was still seen as too complicated).
+As an even more simplified explanation: Raft is a leader election algorithm, where a fixed set of participants agrees on a leader.
+The elected leader then propose values for sequentially increasing rounds of consensus.
+As long as a device is connected to a majority of the participants that device is guaranteed to see consistent results for each round.
+
+So, how can a strongly consistent algorithm exist in a system that always provides availability?
+The hard part is only when someone wants to read a value, because that is when inconsistencies may arise.
+However, in :{cvtr} no values are ever read – the system only reacts to changes.
+This does not mean that we have finally made a distributed system that is both available and consistent.
+Availability is still lost if the progress of the application depends on the results of the consensus.
+To understand why, consider how consensus works.
+Each participant has a replica of the current state of the Raft algorithm, which includes information like votes for the leader, proposed values for the rounds of consensus, and votes for values.
+Each device may locally operate on the Raft CRDT independently, but for a proposed value to ever be accepted, the state needs to contain votes from at least half the participants.
+If those votes do not arrive at a device, that device will never see any vote succeeding.
+
+This experiment shows an interesting insight: strong consistency can be implemented as a simple data type.
+The whole implementation is not at all concerned with low-level details, such as the existence of any network, messages, message orders, faults, none of that.
+The core algorithm is cleanly separated from the distributed nature of the runtime.
+Moreover, in the spirit of the rest of the chapter, this experiment proves that conceptually :{cvtr} does support applications that need strong consistency, however, at the usual cost of availability for the consistent parts.
+
+
+
+# Conclusion
+
+The integration of CRDTs in :{cvtr} provides insights and advantages of both, while the limitation are of the two approaches are so similar that the cost does not have to be paid twice.
+Moreover, we do believe that :{cvtr} provides an insight into how the very useful operational properties of typical CRDTs – and ongoing research on CRDTs – can be applied beyond the classical way to express CRDTs.
+While :{rescala} may or may not be the future of distributed programming, we believe the underlying approach of :{cvtr} is inevitable.
+There is a clear point in the design space of :{apps} where causal consistency is the optimal choice (c.f. the :cite{CALM theorem; Hellerstein2019}), but it is not yet clear what the optimal way to design such applications is.
+:{cvtr} shows that there is a lot of flexibility in the design space, without compromising the underlying guarantees.
+

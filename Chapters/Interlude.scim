@@ -1,0 +1,16 @@
+== Interlude
+style = unnumbered
+
+Thus far, we have introduced the core of the :{cvtr} programming paradigm and the implementation of :{rescala}.
+We have given an intuition how the programming paradigm is used to implement applications.
+We have proven that applications exclusively using this paradigm tolerate partial failures of distributed architectures, provide causal consistency when connections are unreliable, and have a transactional behavior for user interactions matching developers and users expectations.
+
+In the rest of this thesis we validate the wider applicability of the :{cvtr} programming paradigm beyond just the core language and the basic principles.
+We believe it is important that developers do not have to give up all of their existing tools, knowledge, and applications to benefit from :{cvtr}.
+All modern general-purpose programming languages support multiple programming paradigms and :{cvtr} intends to expand those choices not replace them.
+Thus, in this part we explore the practical implications of using :{cvtr} and :{rescala}.
+We provide several extensions of the core concepts provided so far to demonstrate that :{cvtr} integrates with a wide range of other programming paradigms and concepts, including exceptions, CRDTs and monotonic programs, embedded devices with limited resources, and debuggers and live programming.
+We present case studies implemented in :{rescala} that show a range of different applications as evidence that the programming paradigm is expressive enough and the implementation efficient enough for actual use.
+Based on the case studies, we then share our experience of using :{rescala} and discuss typical caveats we observed over the years when developing with :{cvtr}.
+Finally, we discuss targeted performance experiments that evaluate individual parts of the implementation and that demonstrate empirically what :{rescala} is capable of.
+

@@ -1,0 +1,102 @@
+% conditional macros
+\usepackage{ifthen}
+
+% rule syntax
+\newcommand{\instore}[2]{\left<#2\right>#1}
+\newcommand{\ndevice}[3]{#1\instore{#3}{#2}}
+\newcommand{\prop}[2]{\left(#1; #2\right)}
+\newcommand{\tprop}[2]{\triangleright \prop{#1}{#2}}
+\newcommand{\devprop}[5]{\ndevice{#1}{#2}{#3} \triangleright \prop{#4}{#5}}
+
+% helper function names
+\newcommand{\locationp}[1]{\mathit{location}(#1)}
+\newcommand{\makeloc}[2]{#1 = \locationp{#2}}
+\newcommand{\extsourcesp}[1]{\mathit{sources}(#1)}
+\newcommand{\extobservep}[1]{\mathit{observe}(#1)}
+\newcommand{\sigact}[0]{\mathit{true}}
+
+\newcommand{\readyp}[2]{\mathit{ready}(#1,#2)}
+\newcommand{\ready}[3]{#3 \in \readyp{#1}{#2}}
+\newcommand{\nready}[3]{#3 \not\in \mathit{ready}(#1,#2)}
+
+\newcommand{\outdatedp}[1]{\mathit{outdated}(#1)}
+\newcommand{\outdated}[2]{#2 \in \outdatedp{#1}}
+\newcommand{\noutdated}[2]{#2 \not\in \mathit{outdated}(#1)}
+
+\newcommand{\reevexp}[1]{\mathit{eval}(#1)}
+\newcommand{\filterexp}[1]{\mathit{filter}(#1)}
+\newcommand{\stateful}[1]{\mathit{stateful}(#1)}
+
+\newcommand{\mmerge}[0]{\mathit{merge}}
+\newcommand{\massign}[3]{\mathit{update}(#1,#2,#3)}
+
+\newcommand{\inputs}[1]{\mathit{inputs}(#1)}
+\newcommand{\dom}[1]{\mathit{dom}(#1)}
+\newcommand{\dynamic}[1]{\operatorname{dynamic}(#1)}
+\newcommand{\complete}[1]{\mathit{complete}(#1)}
+
+
+% reactive state names
+\newcommand{\inp}[0]{\mathit{in}}
+\newcommand{\obs}[0]{\mathit{obs}}
+\newcommand{\rst}[0]{\mathit{rst}}
+\newcommand{\act}[0]{\mathit{act}}
+\newcommand{\vala}[0]{\mathit{val}}
+\newcommand{\op}[0]{\mathit{op}}
+
+% types
+\newcommand{\type}[1]{\operatorname{#1}}
+
+
+% syntax macros for code in rules
+\newcommand{\fun}[2]{#1 \mathrel{=\!>} #2}
+\newcommand{\evt}[1]{\operatorname{Source}(#1)}
+\newcommand{\react}[2]{#1.\operatorname{Map}\{#2\}}
+\newcommand{\flatten}[1]{#1.\operatorname{Flatten}}
+\newcommand{\unit}{\operatorname{unit}}
+\newcommand{\error}{\operatorname{error}}
+\newcommand{\handle}[2]{\operatorname{try} #1 \operatorname{catch} #2}
+\newcommand{\named}[1]{\ \ \text{(\textsc{#1})}\and }
+\newcommand{\ror}[2]{(#1 || #2)}
+\newcommand{\observe}[2]{#1.\operatorname{observe}(#2)}
+\newcommand{\filter}[2]{#1.\operatorname{Filter}\{#2\}}
+\newcommand{\snapshot}[2]{#1.\operatorname{Snapshot}(#2)}
+\newcommand{\foldn}{\operatorname{Fold}}
+\newcommand{\fold}[3]{#1.\foldn{}(#2)\{#3\}}
+\newcommand{\access}[1]{#1.\operatorname{\!value}}
+\newcommand{\fire}[2]{#1.\operatorname{\!fire}(#2)}
+
+
+
+% compiler
+\newcommand{\trigger}[1]{A\llbracket#1\rrbracket}
+\newcommand{\compile}[1]{C\llbracket#1\rrbracket}
+\newcommand{\vx}[0]{\operatorname{val}\ x_0 = }
+\newcommand{\ccond}[2]{\operatorname{if}\ (#1)\{#2\}}
+\newcommand{\celse}[1]{\operatorname{else}\ #1}
+
+
+
+
+% older syntax macros …
+\newcommand{\rt}[2]{\ #1\triangleright #2}
+\newcommand{\rp}[3]{\ifthenelse{\equal{#3}{}} {\instore{#1}{#2}} {\rt{\instore{#1}{#2}}{#3}}  }
+\newcommand{\crp}[3]{\rp{\ifthenelse{\equal{#1}{}}{t_l}{#1}}{#2}{#3}}
+\newcommand{\device}[2]{\ifthenelse{\equal{#2}{}}{\Sigma}{#2}#1}
+
+
+% traces
+\newcommand{\trace}[0]{\mathit{trace}}
+\newcommand{\ptrace}[0]{\mathit{ptrace}}
+\newcommand{\txtrace}[0]{\mathit{transaction}}
+\newcommand{\ctrace}[0]{\mathit{ctrace}}
+\newcommand{\stp}[1]{\xrightarrow{#1}_p}
+\newcommand{\causal}[1]{\mathit{cause}(#1)}
+
+
+% location helpers
+\newcommand{\locm}[1]{r_\mathit{#1}}
+\newcommand{\locn}[1]{$\locm{#1}$}
+
+
+

@@ -1,0 +1,758 @@
+== The :{rescala} Project
+label = chapter-project
+
+In this chapter we describe how :{rescala} extends :{fr} to provide a modular implementation of the :{cvtr} programming paradigm.
+This involves a discussion of the internal layout of :{rescala}, how the abstractions of :{fr} are encoded in Scala, and how the project is modularized.
+Code examples in this chapter are taken directly from the implementation without modifications other than removing visibility modifiers of methods.
+But first, we look at the history behind :{rescala}.
+
+
+# A Short History of :{rescala}
+
+:{rescala} was created due to an independent desire to continue research on usability and comprehensibility of functional reactive programming into and integrating it into the object-oriented paradigm, inspired by projects such as :cite{FlapJax; Meyerovich2009}.
+:{rescala} technically was an extension of :cite{EScala; DBLP:conf/aosd/GasiunasSMNN11} – an implementation of C# style events in Scala – with a new internal implementation to handle synchronous propagation.
+A focus of early version of :{rescala} was a straightforward integration into typical object-oriented :cite{APIs; Salvaneschi2014}, bridging the gap between code that could be used and understood by undergraduate students and the semantic benefits of functional reactive programming.
+Due to the success of this experiment the API of :{rescala} remains overall similar to how it has been ever since 2014.
+However, besides the API, some tests, and some cases studies, nothing of the original implementation of :{rescala} remains – it has been replaced part for part during the work on this thesis to support the features needed for the :{cvtr} paradigm.
+
+From the very early days, the potential of :{rescala} for the development of distributed systems was explored as part of the :link{PACE ERC; http://pace-erc.eu/} project.
+Joscha Drechsler, as part of his PhD project, designed an update algorithm for :{flowgraph}s which does not require global coordination named :cite{SID-UP; Drechsler2014}.
+SID-UP’s :cite{implementation; sidupGithubWeb} uses node local source sets to track when an update may progress, instead of the global priority queue used by :{rescala}.
+While the implementation of SID-UP is separate from :{rescala}, the work was refined and the results were merged into the :{rescala} code base as one of :{rescala}’s schedulers.
+Schedulers are explained in :ref{Section; section-implementation-schedulers}, while the integration is described in Joscha’s dissertation:cite{; DBLP:phd/dnb/Drechsler19}.
+To enable the rapid development of different update algorithms with different guarantees and their comparison the internal design of :{rescala} was refined multiple times until it reached both simplicity and elegance without sacrificing much flexibility or performance.
+The rest of this chapter explains this design and extends the concepts of the formal model towards a full implementation.
+
+
+# :{rescala}’s Internal Design
+
+::figure{label=fig:rescala-core-packages}
+  :image{/Figures/System/project-structure.pdf}
+
+  Relationship between :{rescala}’s packages.
+  Core in :ref{Figure; fig-project-core-resources_derived_struct}, operators in :ref{Figure; fig-project-custom_derived_reactive}, and scheduler in :ref{Figure; fig-project-scheduler-formal_propagation}.
+::
+
+:{rescala} is split into three main packages, the core, the operators, and the schedulers.
+The relationship between the packages is sketched in (:ref{Figure; fig:rescala-core-packages}).
+The core serves as a common interface between the operators and schedulers.
+The operators implement the interfaces in the core and the schedulers call the methods provided by those interfaces.
+A fourth package, the API, provides developers a uniform interface to the functionality of the three internal packages.
+
+The API of :{rescala} corresponds to the surface syntax we have already seen – methods to create new reactives, start transactions, add observers, and interact with external systems.
+Technically, the API package often simply exports the functionality provided by the operators and schedulers, but bundled into a single package.
+
+The operators of :{rescala} define the behavior of reactives.
+This use of the term operator differs from the formalization where the operator only refers to the function used for computing new values.
+An operator is to a reactive like a class is to an object – the operator defines the behavior and the reactive is an instance of that behavior in the :{flowgraph}.
+Specifically, an operator defines the value type, the function for reevaluation, the activation condition, dynamic reconfiguration of input dependencies, and external effects.
+The implementations for operators are further subdivided into sources, events, signals, and observers.
+
+Schedulers control the dependencies between reactives and thus are responsible for traversing the :{flowgraph}, in particular transactions and propagation.
+Schedulers implement the update algorithm that decides when reevaluation functions are executed based on the knowledge encoded into the :{flowgraph}.
+In extension to :{fr}, the schedulers also protect the values of the reactives from concurrent modifications, and provide distributed execution of the reevaluation functions.
+
+
+The core of :{rescala} defines the :code{ReSource} and :code{Derived} traits (traits are Scala’s version of interfaces) to internally represent reactives as nodes in the :{flowgraph}.
+Their purpose is to provide the interface that glues the scheduler and the operators of :{rescala} together.
+:code{ReSource} provides the declarations combine value parts of a reactive provided by the operator and the state parts provided by the scheduler.
+:code{Derived} is a subtype of :code{ReSource} and extends the latter with a method for reevaluation that allows the scheduler to call the method defined by the operator.
+
+
+It is possible to provide new operators without changing schedulers, and to implement new schedulers that work with all operators.
+In the following sections, we look at the core, the operators, and schedulers of :{rescala} in detail.
+
+
+
+::figure{label=fig-project-core-resources_derived_struct}
+  ``{label=listing-resource_derived-struct}
+    trait Struct { :§Struct§
+      type State[V, S <: Struct] :§type-function§
+      def canNotBeImplemented[A]: A :§enforce-compiletime§
+    }
+
+    trait ReSource[S <: Struct] { :§resource§
+      type Value
+      final type State = S#State[Value, S]
+      def state: State :§state§
+      def name: ReName :§name§
+      def commit(base: Value): Value :§commit§
+    }
+
+    trait Derived[S <: Struct] extends ReSource[S] { :§derived§
+      def reevaluate(ticket: ReevTicket[Value, S]): Result[Value, S]  :§reevaluate§
+    }
+  ``
+  Basic abstractions used in the core of :{rescala} to interface between its operators and schedulers.
+::
+
+# The Core
+
+The core of :{rescala} consists of :code{ReSource} and :code{Derived} – those two traits and all of their methods have to sole purpose of facilitating the communication between the schedulers and the operators.
+:ref{Figure; fig-project-core-resources_derived_struct} shows the code of the two abstractions.
+
+## ReSource
+
+:code{ReSource} (:ref{Line; listing-resource_derived-struct; line=resource}) declares
+a state (:ref{Line; listing-resource_derived-struct; line=state}) used by the scheduler and operator,
+a name (:ref{Line; listing-resource_derived-struct; line=name}) for debugging and pretty printing,
+and a method to encode how the value changes when the transaction commits (:ref{Line; listing-resource_derived-struct; line=commit}).
+As an example for committing: each event forgets its current value during commit and resets to an empty value.
+
+The type of the state of a :code{ReSource} is defined :code{S <: Struct} – the structure type parameter.
+The :code{Struct} trait (:ref{Line; listing-resource_derived-struct; line=Struct}) encodes a type-level function (:ref{Line; listing-resource_derived-struct; line=type-function}) that computes the state type of a :code{ReSource} given the value type of the operator (and – for technical reasons – also the type of the structure itself).
+We use this type-level function to simulate a limited form of :cite{dependent classes; DBLP:conf/oopsla/GasiunasMO07}, where the :code{ReSource} trait is implemented by an operator, but the inner state implementation is provided by the scheduler.
+This enables the scheduler to provide transactional guarantees on the state inside of operators without compromising type safety.
+
+Most interfaces in :{rescala} are parameterized on the :code{Struct} type.
+Most notably, signals, events, and schedulers carry this parameter.
+This enables the use of multiple different schedulers in the same program, while having the type checker ensure that reactives from different schedulers cannot be combined with each other.
+Unchecked combinations result in runtime violations, because different schedulers use completely different metadata for their reactives.
+It is of note, that the structure trait is a purely compile time construct, it never has any actual implementations (which is actually enforced by the construct in :ref{Line; listing-resource_derived-struct; line=enforce-compiletime}).
+
+
+::figure{label=fig-project-core-result_trait}
+  ``{label=listing-project-coreresult_trait}
+    trait Result[T, S <: Struct] {
+      def activate: Boolean
+      def forValue(f: T => Unit): Unit
+      def forEffect(f: Observation => Unit): Unit
+      def inputs(): Option[Set[ReSource[S]]]
+    }
+
+    class StaticTicket[S <: Struct](creation: Initializer[S]) extends InnerTicket(creation) {
+      def collectStatic(reactive: ReSource[S]): reactive.Value
+      def dependStatic[A](reactive: Interp[A, S]): A = reactive.interpret(collectStatic(reactive)) :§interpretation§
+    }
+  ``
+  Result trait communicating all the information we have already seen in :{fr} between the scheduler and operator of :{rescala} and the ticket implementation used for reactives that allow dynamic access.
+::
+
+### Note on Scala 3
+
+Scala 3 has removed type projection (the :code{Struct#State} syntax) because it may lead to unsoundness when combined with certain other language features.
+For compatibility, we adapted the encoding of the state type in the implementation.
+However since this happened after the submission and assessment of this thesis the code and descriptions provided here remain as they were, but we do provide a summary of the changes.
+Instead of projecting the state type from the type parameter provided to all core classes, these classes are now inner classes of a new outer scope.
+The state type is defined as a type member of the outer scope.
+This new encoding is technically more complex, but does not change the developer API nor any of the  provided guarantees.
+
+## Derived
+
+:code{Derived} (:ref{Line; listing-resource_derived-struct; line=derived}) extends a :code{ReSource} with the ability to reevaluate (:ref{Line; listing-resource_derived-struct; line=reevaluate}).
+Reevaluation follows a protocol where a ticket for accessing the inputs of the reactives is provided by the scheduler and used by the operator.
+The reevaluation function returns a result, which encodes all the changes that need to be applied to the reactive, as well as information about how the propagation has to continue.
+:ref{Figure; fig-project-core-result_trait} shows the result trait and a ticket class.
+The result trait provides accessors for the activation, value, effect, and dynamic inputs that are caused by the reevaluation.
+The static ticket class is one of multiple ticket implementations, but all other implementations behave the same.
+The different tickets exist to improve performance for common cases, for example, when there are no dynamic dependencies.
+All tickets provide a :code{depend} method to access the value of a :code{ReSource} (:ref{Line; listing-project-coreresult_trait; line=interpretation}).
+
+## Creation of Reactives and Transactions
+
+The core module also facilitates the interaction between operators and the schedulers when creating reactives, and when starting new transactions.
+There are also abstractions in the core package for those interactions, but they are more of an implementation detail of :{rescala} and less interesting for the concepts of :{cvtr} and the relation with :{fr}.
+We will see the creation of reactives and transactions in more detail when discussing the scheduler and operator packages, but the short overview is as follows.
+
+A reactive is created in three steps.
+The scheduler first creates the internal state.
+The state is then passed to the operator package and wrapped inside an operator implementation to form a complete reactive.
+Finally, the reactive is passed back to the scheduler to be added to the :{flowgraph}.
+
+To start a new transaction, the user-defined transaction code collects an intended change from each source.
+These intended changes are then passed to the scheduler that applies the changes to all sources simultaneously, and then performs a propagation.
+The next section looks at these interactions from the operator’s view to show how both the ticket is used, and the result is created.
+
+# The Operators
+label = section-project-operators
+
+The operator of a reactive defines how that reactive behaves.
+We might say that a specific reactive is an instance of an operator similar to how we would say that a specific object is an instance of a class.
+For example, the map event operator defines that its reactive has a single input, the value of the reactive is derived from the value of the input by applying a user-defined function.
+The concrete details – such as what the input or the user-defined functions are – are only specified when an instance of a reactive is created, they are not part of the operator.
+While there are many individual operators in :{rescala} their behavior usually belongs to one of the following categories of operators.
+The categories consist of the two sources (Var and Evt) and the three derived reactives: signals, events, and observers.
+The similarities between operators in the same category makes the semantics of :{rescala} more approachable for developers.
+
+To understand the role of operators in the implementation of :{rescala}, we will discuss how new operators are implemented.
+Our formalization, :{fr}, does not distinguish between categories such as signals and events and the same is true for the internal implementation of :{rescala}.
+Thus, new implementations of operators are also not limited to these categories, instead each new operator independently defines the following properties and behaviors of derived reactives and source reactives (the separation into sources and derived reactives is required by the core package).
+
+• The initial value and type of value of the reactive. (For both sources and derived reactives.)
+• The initial list of inputs.
+• Which static and dynamic inputs are accessed during reevaluation.
+• The activation function of the reactive.
+• The new value computed during reevaluation.
+• Any effects to be executed at the end of the transaction.
+• A change to the value during the commit of a transaction.
+• How external changes are applied to sources.
+
+
+
+
+::figure{label=fig-project-custom_derived_reactive}
+  ``{label=listing-custom_derived_reactive}
+    class CustomDerivedString( :§custom-operator§
+        initState: S#State[String, S], :§init-state§
+        inputSource: Interp[String, S] :§init-input§
+    ) extends Derived[S]
+        with Interp[String, S] {
+      type Value = String
+      def state: State               = initState
+      def name: ReName               = "I am a name"
+      def commit(base: Value): Value = base :§commit§
+
+      def reevaluate(input: ReIn): Rout = { :§reevaluate§
+        val sourceVal = input.dependStatic(inputSource) :§acces§
+        input.withValue(sourceVal + " :D") :§return§
+      }
+
+      def interpret(v: Value): String = v
+    }
+
+    val customDerived: Interp[String, S] = :§instantiate§
+      Ticket.fromScheduler(scheduler) :§create-ticket§
+        .create(
+          Set(customSource), :§s-input§
+          "This is the initial value", :§s-value§
+          inite = false :§inite§
+        ) { createdState => :§provided-state§
+          new CustomDerivedString(createdState, customSource)
+        }
+  ``
+  Implementing a new type of operator for a derived reactive.
+::
+
+
+## Custom Sources
+
+:ref{Figure; fig-project-custom_derived_reactive} shows the implementation of a new operator (:code{CustomDerivedString} in :ref{Line; listing-custom_derived_reactive; line=custom-operator}) for derived reactives and how to create a new reactive using that custom operator (:code{customDerived} in :ref{Line; listing-custom_derived_reactive; line=instantiate}).
+
+Instances of :code{CustomDerivedString} define all the reevaluation related functionality.
+The initial state (:ref{Line; listing-custom_derived_reactive; line=init-state}) and single initial input (:ref{Line; listing-custom_derived_reactive; line=init-input}) are the parameters to the operator and define how two reactives using this operator differ.
+
+The reevaluation method (:ref{Line; listing-custom_derived_reactive; line=reevaluate}) of the custom operator accesses (:ref{Line; listing-custom_derived_reactive; line=acces}) the value of the :code{inputSource} statically, and returns a transformed value.
+Using :code{withValue} (:ref{Line; listing-custom_derived_reactive; line=return}) to return a value also makes the reactive activate – signaling to the scheduler that the change must be propagated.
+
+The implementation of the :code{commit} method (:ref{Line; listing-custom_derived_reactive; line=commit}) states that the value after the transaction stays unchanged.
+
+To create reactives we need the state implementation from the scheduler, because the scheduler controls when reactives are created and how.
+Technically, the API to create new state is provided by another type of :code{Ticket} (:ref{Line; listing-custom_derived_reactive; line=create-ticket}), but the process is essentially handled by the scheduler.
+To create the state for the new reactive, the scheduler is informed of the input reactive (:ref{Line; listing-custom_derived_reactive; line=s-input}), the initial value (:ref{Line; listing-custom_derived_reactive; line=s-value}), and a boolean stating if the operator requires initial evaluation of the reactive (:code{inite} in :ref{Line; listing-custom_derived_reactive; line=inite}).
+The scheduler will then provide a new :code{createdState} (:ref{Line; listing-custom_derived_reactive; line=provided-state}), which contains the initial value, as well as scheduler specific information, and that state is passed to the operator to create a new reactive.
+Note that the :code{create} method discussed in the next section from the schedulers side has a slightly different API, because the ticket used by operators rearranges the parameters (adding the ticket itself) when forwarding the call to the scheduler.
+
+The type of the returned reactives is :code{Interp} (:ref{Line; listing-custom_derived_reactive; line=instantiate}).
+We have already seen :code{Interp} – it is the type used by the reevaluation ticket to access the value of a reactive.
+For example, the internal type of :code{Signal[Int]} is :code{ReSource[Pulse[Int]]} (the pulse wrapper is used for internal bookkeeping of signal and event operators), and the :code{Interp[Int]} encapsulates the conversion from :code{Pulse[Int]} to just :code{Int}.
+Usually a returned reactive would have a more interesting type than :code{Interp}, such as :code{Signal} or :code{Event} – providing some methods to derive new reactives – but in this example we stick to the minimum.
+
+
+
+::figure{label=fig-project-custom_source_reactive}
+  ``{label=listing-custom_source_reactive}
+    class CustomSource[T](initState: S#State[T, S]) extends ReSource[S] with Interp[T, S] {
+      outer =>
+
+      type Value = T
+      def state: State               = initState
+      def name: ReName               = "I am a source name"
+      def interpret(v: Value): T     = v
+      def commit(base: Value): Value = base
+
+      def makeChange(newValue: T) = :§make-change§
+        new InitialChange[S] { :§initial-change§
+          val source = outer
+          def writeValue(base         : outer.Value, :§writeValue§
+                         writeCallback: outer.Value => Unit
+                        ): Boolean = {
+          if (base != newValue) { :§no-change-check§
+            writeCallback(newValue) :§write-callback§
+            true :§return-activation§
+          } else false
+        }
+      }
+    }
+
+    val customSource: CustomSource[String] =
+      Ticket.fromScheduler(scheduler)
+        .createSource("Hi!") { createdState => :§s-create§
+          new CustomSource[String](createdState)
+        }
+
+    transaction(customSource) { _.recordChange(customSource.makeChange("Hello!")) } :§transaction§
+  ``
+  Implementing a new type of operator for a source reactive.
+::
+
+## Custom Derived Reactives
+
+Creating custom sources is shown in :ref{Figure; fig-project-custom_source_reactive}, and is similar to operators for derived reactives, with the exception that sources have no :code{reevaluate} method.
+Instead, the :code{makeChange} method (:ref{Line; listing-custom_source_reactive; line=make-change}) provides an interface to convert an external value into an :code{InitialChange} object (:ref{Line; listing-custom_source_reactive; line=initial-change}).
+A transaction (:ref{Line; listing-custom_source_reactive; line=transaction}) records one or more of these initial changes before the transaction starts and then applies them simultaneously to their respective sources.
+
+Through the use of Scala’s path dependent types, the signature of the :code{writeValue} method (:ref{Line; listing-custom_source_reactive; line=writeValue}) in the :code{InitialChange} object must be an inner class of the source operator to actually provide a new value to the source, because the concrete type of the :code{Value} type member is unknown outside the :code{CustomSource} implementation.
+Thus, we use the type system here to ensure that the operator controls what value is applied to a reactive even though the scheduler controls when the value is changed.
+
+The :code{writeValue} method for our example checks that a new value is not identical to the current value (:ref{Line; listing-custom_source_reactive; line=no-change-check}), if so it executes the :code{writeCallback} (:ref{Line; listing-custom_source_reactive; line=write-callback}) which instructs the scheduler to actually store the value.
+The return value of :code{writeValue} (:ref{Line; listing-custom_source_reactive; line=return-activation}) decides whether the changed source activates (i.e., propagates its value) during the transaction.
+All operators of :{rescala} currently use this same logic for activation, where a value is propagated exactly if it is not equal to the current value.
+
+The creation of sources is analogous to the creation of derived reactives using a ticket to ask the scheduler to create a new state for the source (:ref{Line; listing-custom_source_reactive; line=s-create}).
+Setting a source uses the :code{makeChange} method inside a transaction (:ref{Line; listing-custom_source_reactive; line=transaction}).
+
+
+# The Schedulers
+label = section-implementation-schedulers
+
+Schedulers mostly use the core interface and the implementation provided by the schedulers.
+The role of the schedulers consists of defining the structure of the state of reactives, ensuring correct creation and initialization of reactives, and managing the transaction life cycle and propagation.
+:{rescala} supports multiple schedulers to enable execution specific to the runtime environment, to provide different trade-offs to applications, and to facilitate research.
+:{rescala} has the following schedulers.
+
+• Level Based:
+  The level-based scheduler assigns an integer level to each reactive.
+  Sources have a level of 0 and derived reactives have a level one larger than the maximum level of their inputs.
+  Propagation happens by adding reactives that need evaluation into a priority queue.
+  This scheduler uses a two version strategy for state where each reactive has a current and updated value to enable transactions to abort on error.
+  This scheduler is the default for JavaScript-based execution environments.
+• ParRP:
+  :cite{ParRP; Mogk2015Thesis} extends the level-based scheduler with a two phase locking scheme before transactions to allow multiple independent transactions to execute in parallel.
+  ParRP is described in detail in :ref{Section; section-implementation-parrp}.
+  ParRP does not compile to JavaScript because of the lack of concurrency primitives in JavaScript.
+  ParRP is the default scheduler for the JVM, because it enables parallel transactions in independent modules to remain independent.
+  However, ParRP has about twice the overhead to create new transactions compared to the level-based scheduler.
+• FullMV:
+  The :cite{FullMV; Drechsler:2018:TRP} scheduler uses multi-version reactives to support pipelining of transactions.
+  This enables parallelization on the granularity of individual reactives, but comes at a very significant overhead for individual transactions.
+  Thus, FullMV is suited for applications with heavy computation within the :{flowgraph}.
+  FullMV support neither JavaScript nor aborting transactions on errors.
+• Distributed FullMV:
+  The distributed :cite{FullMV; DBLP:phd/dnb/Drechsler19} implementation uses a distributed serialization graph to provide a total order on transactions in a distributed system.
+  Distributed FullMV thus provides distributed transactions, however, at the usual cost that the system may become unavailable when the network is unreliable.
+  Note that replication in :{cvtr} uses transactions, but is an independent concept.
+  Thus, it is possible to use distributed transactions from FullMV and combine them with replicated reactives.
+• Research Schedulers:
+  The F scheduler implements the algorithm used in :{fr} (see :ref{Chapter; chapter-formalization}).
+  The Simple scheduler is a minimal implementation of a scheduler in :{rescala} used for educational and experimental purposes.
+  The Test scheduler enables property-based testing of :{rescala} applications.
+  The Debugging scheduler integrates with the debugger (see :ref{Chapter; chapter-live_tuning}).
+
+While all schedulers have their differences, they all have to implement a minimal set of functionality.
+In the remainder of the section, we discuss how schedulers create new reactives, how transactions change the :{flowgraph}, and how schedulers handle the reevaluation of a reactive.
+
+
+
+
+## Initialization
+
+To create a new reactive the scheduler must define the type, provide new instances, and initialize the state of a reactive.
+
+We have discussed in :ref{Section; section-project-operators} how the state of reactives is defined by the structure type parameter.
+:ref{Figure; fig-project-calculuslike_struct} shows an example definition structure of such a structure taken from the F scheduler.
+The :code{FStruct} (:ref{Line; listing-project-calculuslike_struct; line=fstruct}) is the type used for the :code{S} type parameter we have seen in other examples.
+Structure traits in :{rescala} define the state type as a function of the value type (:ref{Line; listing-project-calculuslike_struct; line=state-function}).
+See the discussion of the core package for the :code{Struct} parameter of the :code{State} type function.
+In this example, the state type is a :code{StoreValue[V, S]}, where :code{V} is the value type of the reactive.
+To mutable parts of :code{StoreValue} (:ref{Line; listing-project-calculuslike_struct; line=store-value}) are the current :code{value: V}, and a set of inputs :code{ReSource[S]}.
+
+::figure{label=fig-project-calculuslike_struct}
+  ``{label=listing-project-calculuslike_struct}
+    trait FStruct extends Struct { :§fstruct§
+      override type State[V, S <: Struct] = StoreValue[V, S] :§state-function§
+    }
+
+    class StoreValue[V, S <: Struct](var value: V) { :§store-value§
+      var inputs: Set[ReSource[S]] = Set.empty
+    }
+
+  ``
+  Example of the structure for reactives corresponding to the calculus in :ref{Chapter; chapter-formalization}.
+::
+
+
+::figure{label=fig-project-scheduler-creation}
+  ``{label=label-project-scheduler-creation}
+    def create[V, T <: Derived[S]](incoming: Set[ReSource[S]],
+                                   initv: V,
+                                   inite: Boolean,
+                                   creationTicket: CreationTicket[S])
+                                  (instantiateReactive: S#State[V, S] => T): T = {
+      val state = makeDerivedStructState[V](initv) :§make-struct§
+      val reactive = instantiateReactive(state) :§pass-state§
+      ignite(reactive, incoming, inite) :§ignite§
+      reactive
+    }
+  ``
+  The schedulers part of creating a new reactive.
+::
+
+The :code{create} method of the current scheduler generates a state implementation for new instances of reactives.
+In the current implementation, all schedulers share a single implementation of the create method shown in :ref{Figure; fig-project-scheduler-creation}.
+The implemented protocol is simple, first the internal state for the reactive is created (:ref{Line; label-project-scheduler-creation; line=make-struct}) – the :code{makeDerivedStructState} just returns a new instance of the :code{State} type seen in :ref{Figure; fig-project-calculuslike_struct}.
+Then, the state is passed to a callback provided by the operator implementation (:ref{Line; label-project-scheduler-creation; line=pass-state}) – we have seen an implementation of this callback when discussing custom operators (:ref{Figure; fig-project-custom_derived_reactive} :ref{Line; listing-custom_derived_reactive; line=provided-state}).
+The complete reactive returned by the callback then may be :code{ignite}d (:ref{Line; label-project-scheduler-creation; line=ignite}), which does a reevaluation of the new reactive.
+For example, all normal signals are initialized with an empty value and acquire their current value by executing an initial reevaluation executed as part of ignition.
+
+Note that transactions in :{rescala} may mix creation of reactives with propagation of changes – creation of reactives may even happen during the reevaluation of other reactives.
+To provide transactional guarantees the schedulers must ensure that created reactives are fully initialized before they are used.
+The schedulers in :{rescala} generally do so, with a technical limitation that creation of reactives should not be performed by reactives with dynamic inputs.
+However, our case studies show no clear evidence that mixing creation of reactives with propagation in the same transaction is necessary, but it remains future work to show if the expressiveness would be reduced.
+
+
+
+::figure{label=fig-project-scheduler-transaction_overview}
+  ``{label=listing-project-scheduler-transaction_overview}
+    def forceNewTransaction[R](initialWrites: Set[ReSource[S]], :§fnt§
+                               admissionPhase: AdmissionTicket[S] => R): R = {
+      val tx = makeTransaction(_currentInitializer.value) :§newtx§
+
+      val result =
+        try {
+          tx.preparationPhase(initialWrites) :§preparation§
+          val result = withDynamicInitializer(tx) {
+            val admissionTicket = tx.makeAdmissionPhaseTicket(initialWrites)
+            val admissionResult = admissionPhase(admissionTicket) :§admission§
+            tx.initializationPhase(admissionTicket.initialChanges) :§initialization§
+            tx.propagationPhase() :§propagation§
+            if (admissionTicket.wrapUp != null) admissionTicket.wrapUp(tx.accessTicket()) :§wrapup§
+            admissionResult
+          }
+          tx.commitPhase() :§commit§
+          result
+        } catch {
+          case e: Throwable =>
+            tx.rollbackPhase() :§rollback§
+            throw e
+        } finally {
+          tx.releasePhase() :§release§
+        }
+      tx.observerPhase() :§observer§
+      result
+    }
+  ``
+  Phases of a transaction in :{rescala}’s default scheduler.
+::
+
+## Transactions
+
+The main work of a scheduler is to manage the life cycle of transactions.
+:ref{Figure; fig-project-scheduler-transaction_overview} shows the implementation of a transaction in the default scheduler in :{rescala}.
+The :code{forceNewTransaction} method (:ref{Line; listing-project-scheduler-transaction_overview; line=fnt}) is the internal implementation of the :code{transaction} method used in :ref{Figure; fig-project-custom_source_reactive} (the signature is different because of an indirection in the API).
+The scheduler creates a new transaction (:ref{Line; listing-project-scheduler-transaction_overview; line=newtx}), which contains metadata such as the reactives that still require reevaluation.
+Each transaction of the default scheduler executes multiple phases in order.
+
+• Preparation phase (:ref{Line; listing-project-scheduler-transaction_overview; line=preparation}):
+  This phase makes preparations for thread safety, such as locking the set of reactives that will be changed.
+  The set of initial writes is already known, and other affected reactives are computed based on the graph structure.
+  No changes are visible yet.
+• Admission phase (:ref{Line; listing-project-scheduler-transaction_overview; line=admission}):
+  Executes the transaction initialization code provided by the developer that defines the changes to source reactives (c.f., :ref{Figure; fig-project-custom_source_reactive}).
+  The admission ticket allows to read the value of reactives included in the :code{initialWrites} or their successors to make decisions on which changes to apply.
+• Initialization phase (:ref{Line; listing-project-scheduler-transaction_overview; line=initialization}):
+  Writes the changes recorded in the admission phase into the corresponding source reactives and prepares the propagation.
+• Propagation phase (:ref{Line; listing-project-scheduler-transaction_overview; line=propagation}):
+  Executes the reevaluation method of reactives whose inputs are propagating new values.
+  This phase is central in ensuring that execution happens in topological order, to ensure synchronous semantics.
+  The default scheduler of :{rescala} assigns levels to each reactive and uses a priority queue to decide which reactive to execute next:cite{; Salvaneschi2014}.
+  We will look at the details of reevaluation in the next paragraph.
+• Wrap up phase (:ref{Line; listing-project-scheduler-transaction_overview; line=wrapup}):
+  Executes transaction specific handlers before committing.
+• Commit phase (:ref{Line; listing-project-scheduler-transaction_overview; line=commit}):
+  Does cleanups on internal metadata of the transactions and makes new values permanent, although, not yet accessible to other transactions.
+• Rollback phase (:ref{Line; listing-project-scheduler-transaction_overview; line=rollback}):
+  This phase does cleanup if an exception occurs during propagation.
+  Note that not all schedulers support rollbacks, because it is not required for the core of the :{cvtr} paradigm.
+  See :ref{Chapter; chapter-errors_exceptions} for a discussion of error handling using rollbacks.
+• Release phase (:ref{Line; listing-project-scheduler-transaction_overview; line=release}):
+  Frees resources and locks held by the transaction.
+  After this phase, all changes are visible to other transactions.
+• Observer phase (:ref{Line; listing-project-scheduler-transaction_overview; line=observer}):
+  Runs the registered observers.
+  Observers read the values of reactives during the transaction, but the transaction ends before observers are executed.
+  This enables observers to start new transactions (:{rescala} does not support nested transactions).
+  However, ending transactions makes a race condition possible, where the observers for two transactions are not executed in serialization order.
+  We only keep the current behavior for backwards compatibility with our case studies.
+
+::figure{label=fig-project-scheduler-formal_propagation}
+  ``{label=listing-project-scheduler-formal_propagation}
+    def evaluate(
+        reactive: Derived[FStruct],
+        dynamicOk: ReSource[FStruct] => Boolean,
+        creationTicket: SimpleCreation
+    ): (Boolean, Boolean) = {
+      val dt = new ReevTicket[reactive.Value, FStruct](:§ticket§
+                     creationTicket, reactive.state.value) {...}
+      val reev = reactive.reevaluate(dt) :§reevaluate§
+
+      def finishReevaluation() = { :§write-results§
+        reev.forValue(reactive.state.value = _)
+        reev.forEffect(_.execute())
+        (true, reev.activate)
+      }
+
+      reev.inputs() match {
+        case None => // static reactive
+          finishReevaluation()
+        case Some(inputs) => //dynamic reactive :§dynamic§
+          reactive.state.inputs = inputs
+          if (dynamicOk(reactive)) finishReevaluation()
+          else (false, reev.activate)
+
+      }
+    }
+  ``
+  Reevaluation handling in the scheduler for :code{FStruct}.
+::
+
+## Reevaluation
+
+For the reevaluation we show the code from the F scheduler that imitates :{fr}, because the implementation of the default scheduler is too concerned with performance to serve well for educational purposes.
+We have already seen the structure (:code{FStruct}) of reactives for that scheduler in :ref{Figure; fig-project-calculuslike_struct} – that is, the structure that has a mutable value and a mutable set of inputs.
+The reevaluation logic for reactives with the :code{FStruct} is shown in :ref{Figure; fig-project-scheduler-formal_propagation}.
+We have already shown how this interaction looks like from the side of the operator in :ref{Figure; fig-project-custom_derived_reactive}.
+The scheduler for the :code{FStruct} uses a simplified variant of the phases discussed in the previous paragraph, where observers are executed as soon as their value is known, and rollback is impossible.
+The implementation for the propagation phase ensures that each reactive is reevaluated in topological order.
+To evaluate a single reactive, the scheduler creates a reevaluation ticket (:ref{Line; listing-project-scheduler-formal_propagation; line=ticket}) and passes that to the reevaluation function implemented by the operator (:ref{Line; listing-project-scheduler-formal_propagation; line=reevaluate}).
+The result from the reevaluation contains a list of new inputs for dynamic reactives, a new value, and side effects to be executed.
+The scheduler is responsible for writing the returned results to update the structure of the reactive (:ref{Line; listing-project-scheduler-formal_propagation; line=write-results}).
+In the case when new inputs are detected, it is possible that the evaluation did not happen in topological order (:ref{Line; listing-project-scheduler-formal_propagation; line=dynamic}).
+This scheduler thus does not update reactive and instead continues the propagation.
+The skipped reactive is later reevaluated again after the new inputs have been reevaluated.
+
+
+# ParRP
+label = section-implementation-parrp
+
+ParRP enables concurrent transactions to execute in parallel, while preventing conflicts between overlapping transactions.
+In complex applications with many modules, the sets of reactives affected by two transactions may be in independent modules.
+Thus, the transactions should execute in parallel, to increase throughput and prevent independent modules from having to wait for each other.
+Since the original publication in my :cite{master thesis; Mogk2015Thesis}, the algorithm behind ParRP has not changed,
+but the implementation was refined and a simplified explanation is provided in this section to serve as a demonstration for the power and flexibility of :{rescala}’s design.
+
+ParRP provides serializability for transactions and executes independent transactions in parallel.
+To do so, ParRP computes the write set – all reactives that could change in a transaction –  and acquires exclusive locks before writing any changes.
+Note that any transaction A executing in parallel can change the graph, thus changing the write set for a transaction B.
+In many systems, such interactions require rollbacks to ensure correct results.
+However, because ParRP operates on a directed acyclic graph we can show that it suffices to extend the transaction B (the one that had its write set changed) to also propagate values to (parts of) the reactives in the write set of transaction A by “inheriting” the write set from one transaction to another.
+ParRP detects such situations and transaction A transfers its locks to transactions B without releasing them, enabling B to continue without rollback or deadlock.
+For the remaining discussion in this thesis, it suffices to understand that reactives in ParRP must support being locked and must support having multiple values to enable handling complex interactions between parallel transactions.
+
+As another point of modularization, the concurrency control of ParRP does not depend on the used propagation algorithm
+and preserves the semantic properties of the used algorithm (e.g., glitch freedom).
+In the current version, ParRP uses the :cite{priority queue; Maier2012} for propagation.
+After locking is done the propagation algorithm can run unmodified, except that ParRP must be notified when new dataflow edges are added.
+
+::figure{label=fig-project-parrp_struct}
+  ``{label=listing-project-parrp_struct}
+    trait ParRPStruct extends Struct { :§struct§
+      type State[P, S <: Struct] = ParRPState[P, S]
+    }
+
+    class ParRPState[V, S <: Struct]( :§state§
+        var current: V, :§current§
+        val lock: ReLock[ParRPInterTurn])
+      extends Committable[V] {
+
+      var owner: Token = null :§owner§
+      var update: V    = _ :§update§
+
+      def write(value: V, token: Token): Boolean = {
+        assert(owner == null || owner == token, s"buffer owned by $owner written by $token")
+        update = value
+        val res = owner == null
+        owner = token
+        res
+      }
+      def base(token: Token): V = current
+      def get(token: Token): V = { if (token eq owner) update else current }
+
+      def commit(r: V => V): Unit = {
+        current = r(update)
+        release()
+      }
+      def release(): Unit = {
+        update = null.asInstanceOf[V]
+        owner = null
+      }
+
+      /* incoming and outgoing changes (some helpers not shown) */
+      var incoming: Set[ReSource[S]]                   = Set.empty :§incoming§
+      var outgoing: mutable.Map[Derived[S], None.type] = mutable.HashMap.empty :§outgoing§
+    }
+
+  ``
+  The structure for reactives when using ParRP.
+::
+
+:ref{Figure; fig-project-parrp_struct} shows the structure for ParRP reactives.
+The structure provides the same interface as the structure in :ref{Figure; fig-project-calculuslike_struct}, but has much more internal state for bookkeeping.
+The :code{ParRPStruct} (:ref{Line; listing-project-parrp_struct; line=struct}) is used to encode the type level function, with :code{ParRPState} (:ref{Line; listing-project-parrp_struct; line=state}) being the implementation of state of reactives.
+:code{ParRPState} also has a :code{current} (:ref{Line; listing-project-parrp_struct; line=current}) value, but also an :code{update}d (:ref{Line; listing-project-parrp_struct; line=update}) value, which belongs to a :code{owner} transaction identified by a :code{Token} (:ref{Line; listing-project-parrp_struct; line=owner}).
+Finally, the sets of :code{incoming} (:ref{Line; listing-project-parrp_struct; line=incoming}) and :code{outgoing} (:ref{Line; listing-project-parrp_struct; line=outgoing}) edges in the :{flowgraph}.
+
+
+
+:% 1, 2 threads
+:% 376,250
+:% 224,155
+:% -
+:% 361
+:% 441,017
+
+
+
+For graph structures which allow parallel propagation and a multi-core processor,
+we can show an increase in performance over the synchronous implementation.
+See :ref{Chapter; chapter-microbenchmarks} for detailed performance experiments.
+How large the increase is depends on the size of the changed graph and the frequency of conflicts.
+Our benchmarks suggest a 1.4x throughput increase utilizing 2 cores up to a 5x increase utilizing 8 cores
+for common graphs.
+For transactions without conflicts, ParRP scales linearly with the number of CPU cores, but the added cost of allocating data structures for conflict management only allows to realize the full speedup in cases where each transaction executes expensive computation that profits from parallelization.
+However, to support concurrency ParRP has a setup cost for each transaction: our benchmarks indicate at least 700 CPU cycles (in addition to 1170 CPU cycles of the level-based scheduler) and increasing with the size of the transaction.
+
+In our case studies (:ref{Chapter; chapter-case_studies}), we observe that a common pattern for :{apps} is to have a number of mostly disjunct subgraphs,
+which are joined into a single dependent reactive
+(e.g., a user interface consisting of multiple parts rendered to the same window).
+Because of two phase locking this single dependent has to be locked to start propagation on any of the subgraphs,
+so we cannot parallelize such cases under our current approach.
+A possible solution is to use pipelining when propagating multiple updates.
+With pipelining instead of a transaction waiting on the completion of the prior update the waiting becomes more fine-grained and waiting happens for individual reactives.
+These optimizations are again completely transparent to the programmer showing the strength of the :{cvtr} model.
+
+
+
+# CRDTs in :{rescala}
+
+While :{cvtr} benefits from the synergies between state-based CRDTs and transactional reactive programming the implementation of both are independent with the network runtime making use of both.
+In :{rescala} any signal with a value for which a lattice type class exists can be replicated.
+We will look at that type class, how CRDTs are used by developers, and at the network runtime.
+However, note that CRDTs in :{rescala} are still ongoing research, so the details are likely to change.
+
+::figure{label=fig-project-lattice_interface}
+  ``
+    trait Lattice[A] {
+      /** By assumption: associative, commutative, idempotent. */
+      def merge(left: A, right: A): A
+    }
+
+    // Lattice instance for Set[A]
+    implicit def setInstance[A]: Lattice[Set[A]] =
+      new Lattice[Set[A]] {
+        override def merge(left: Set[A], right: Set[A]): Set[A] = left.union(right)
+      }
+  ``
+  Lattice API used by :{rescala} and its network runtime, and the implementation of Lattice for Scala Set.
+::
+
+## Lattices
+The lattice interface is shown in :ref{Figure; fig-project-lattice_interface}.
+For any type :code{A} a :code{Signal[A]} can be replicated if there is a corresponding instance of :code{Lattice[A]}.
+All that is needed for the instance is a merge function which must be associative, commutative, and idempotent.
+For example, :ref{Figure; fig-project-lattice_interface} shows the implementations of the lattice instance for :code{Set[A]}.
+The union operation of sets has the correct properties to be used as a merge function, thus the instance only forwards the call.
+:{rescala} provides instances for sets, maps, and options in addition to custom CRDT implementations such as counters, sequences, and observe-remove sets.
+External libraries that provide state-based CRDTs may be used as well by providing a lattice instance that maps to the external libraries merge implementation.
+
+## CRDT API
+From the developers point of view, a replicated signal can be constructed like any other signal.
+For example, a fold reactive that uses a set for its state may use any built-in operation on sets to compute its local state.
+:{rescala} does not interfere and directly provides developers access to the API of the used data type.
+This provides developers with the flexibility to choose a CRDT implementation that suites the desired features and performance requirements of their application.
+It is also possible for developers to only learn how to use the CRDTs they require, similar to how collection libraries can be learned and understood in small pieces.
+The ability to mix and match implementations, experiments with new APIs, and even develop new CRDTs for particular implementations is core to the flexibility of the :{cvtr} programming paradigm.
+
+The only caveat is that the replication semantics is always specified by the merge function.
+For example, the merge function for sets in :ref{Figure; fig-project-lattice_interface} will always keep all elements of both sets.
+So if elements are removed locally from a replica, those elements will be added again during the next synchronization.
+To support removal of elements, a CRDTs implementation that supports a merge function with removal must be used.
+It is crucial for developers to understand the semantics of the merge function of their chosen data type.
+However, merging is the :emph{only} additional concept required to write distributed programs in :{rescala}.
+This simplifies distributed programming, because once an application works correctly with the given restrictions, it works correctly in all possible failure conditions.
+
+
+::figure{label=fig-project-network_distribute}
+  ``
+    def replicate[A: Lattice, S <: Struct: Scheduler](
+        signal: Signal[A, S],
+        registry: Registry)
+       (binding: Binding[A => Unit]{
+          type RemoteCall = A => Future[Unit] })
+       : Unit
+  ``
+  Method of the network runtime to replicate signals.
+::
+
+## Network Runtime
+The network runtime in :{rescala} uses :cite{ScalaLoci; Weisenburger:2018:DSD} to abstract communication over channels such as TCP and Websockets.
+The network runtime makes use of lattices and the transactional semantics of schedulers.
+:ref{Figure; fig-project-network_distribute} shows the signature of the replicate method of the network runtime.
+This method instructs the network to also replicate the :code{signal} in the network defined by the :code{registry}.
+Registries are a ScalaLoci abstraction to group a set of connections to other devices and bindings of remote values.
+The :code{binding} is a type-safe identifier to detect that two reactives on two different devices are replicas of each other.
+It also provides the serialization strategy of the values of the reactive.
+The replicate method interacts with the scheduler to send the state of replicated reactives to other devices connected to the registry after each transaction.
+The network runtime also starts a new transaction whenever an update from the network is received.
+Values are serialized using common Scala libraries such as Circe and Jsoniter,
+which support type-safe serialization for most built-in immutable Scala data types.
+Custom serializers can be provided using type classes.
+The serializer for signals is special and
+causes the signal to be published
+as described in Section :ref{sec:replication}.
+
+
+
+# Snapshots
+:{rescala}’s snapshot and restoration mechanism supports storing snapshots in arbitrary key-value stores.
+We have two implementations for in-memory stores: one that
+writes directly to disk (for JVM and Android) and another one that uses HTML5
+:cite{localStorage; localstorage} for web browsers.
+
+
+Using fault-tolerant reactives is thread-safe,
+but care must be taken when reactives are created in a multi-threaded environment.
+Snapshots in :{rescala} require unique IDs to identify reactives, and our current implementation uses thread-local
+counters to generate IDs, e.g., the IDs :code{UI-0} and :code{UI-1} are associated to
+the first and to the seconds reactive created in the context of the UI thread.
+This ID generation strategy is well suited for applications with a fixed set of threads,
+but it cannot cope with the case in which
+threads are created and used dynamically in a thread pool,
+because the IDs generated for those threads do not remain the same between restarts of the application.
+:{rescala} requires the developer to explicitly handle the assignment of IDs to reactives
+if the automatic mechanism is insufficient.
+In practice, it is in most cases sufficient to ensure that
+dynamically scheduled tasks (e.g., those in thread pools) are assigned deterministic names
+to enable correct automatic generation of unique IDs.
+
+
+
+## Key Value Stores for Snapshots
+
+Key-value stores are a good fit as the underlying storage for our snapshots,
+where the unique name of the reactive is the key,
+and the corresponding values of all changed reactives are stored to create a new snapshot.
+Many key-value stores are available in a wide range of application domains.
+We can take advantage of some storage features, if available.
+If the storage provides atomic all-or-nothing writes for a set of keys,
+we can store the set of changed reactives more efficiently and do not need to synchronize after an update.
+Fault-tolerant stores would make the whole restoration process robust against storage failures.
+
+
+The consistency guarantees provided by the update propagation of the reactive runtime to ensure glitch freedom
+can be used to relax the requirements on the store.
+First, the reactive runtime ensures that there is no concurrent access to a single reactive,
+so the store does not have to synchronize writes.
+Second, reads of snapshot values only happen on recovery,
+so the store does not need to synchronize reads and writes of the same value.
+This also allows us to work with eventually consistent stores,
+as no more writes happen after a crash and recovery can wait until the store is consistent.
+
+
+
+# Conclusion
+
+:{rescala} shows that the declarative nature of the programming paradigm is also reflected in the implementation.
+The definition of operators is strictly separate from the semantics of transaction and the propagation of values through the :{flowgraph}.
+This enables not only to have multiple implementations of each for different use cases and combining them as needed, but also makes research on advanced features such as concurrency control, parallelization, and distribution much easier.
+We highly recommend :{rescala} as a platform to experiment with the :{cvtr} programming paradigm and other research on languages for :{apps}.
+

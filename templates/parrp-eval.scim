@@ -1,0 +1,23 @@
+\documentclass[preview, varwidth]{standalone}
+
+\standaloneconfig{border=4mm 0cm 0cm 4mm} 
+
+:{xetex fonts}
+
+\usepackage{overpic}
+\usepackage{caption}
+
+\usepackage{geometry}
+
+\geometry{twoside=false, head=1pc, foot=2pc,
+     paperwidth=8.5in, paperheight=11in,
+     includeheadfoot,
+     top=78pt, bottom=114pt, inner=0pt, outer=0pt
+     }
+
+\begin{document}
+
+:{template content}
+
+\end{document}
+

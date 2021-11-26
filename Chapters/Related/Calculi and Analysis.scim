@@ -1,0 +1,92 @@
+# Calculi for Concurrent and Distributed Systems
+label = section-related_work-calculi
+
+Several formal calculi have been developed for concurrent and distributed systems.
+In addition, there are formal approaches that also argue for correctness properties based on high-level programming paradigms, because those are easier to understand by developers.
+Finally, there is research on type systems that ensure guarantees of the communication between multiple devices.
+
+## Concurrent Calculi
+
+There is a wide variety of :cite{calculi; Milner:1982:CCS,Milner:1992:PICalculus,Hoare:1978:CSP,Fournet1996,Cardelli:1999:TMA}
+covering traditional distributed and concurrent systems.
+These calculi usually base their communication on message passing and use parallel composition of processes.
+The focus of these calculi in general is on smaller distributed systems, such as a single processor.
+Many processes are created and completed during execution, thus the communication structure between processes is always changing.
+These calculi usually have no inherent concept of unreliable communication over the Internet and instead they specify how the system behaves when messages are reliably sent and received.
+
+:cite{Caires; Caires2017} adds linear types to the :math{\pi}-calculus, to model protocols including unreliable message delivery.
+However, even with unreliability addressed at the message level, these calculi do not understand how dataflow of the processes is connected, thus making automatic fault tolerance based on the application semantics hard to achieve.
+
+:cite{style=name; DalLago:2019:ITR} investigate theoretical foundations for typed runtime errors in the :math{\pi}-calculus.
+Cloud :cite{calculus; Jarraya2012} applies the above to a distributed system,
+but focuses on upholding security policies when migrating processes between virtual machines,
+which considers low level equivalence between implementations.
+More recently, :cite{Atkey; Atkey2017} adds external communication to classical processes with a focus on the external behavior of processes and less on internal details.
+
+
+The work by :cite{style=name; Gleissenthall:2019:PSS} uses the fact that typical applications have limited communication structures
+and extracts synchronous specifications from programs with only minimal annotations.
+Properties of the asynchronous communication behavior of the application are derived and proven based on these annotations.
+Our calculus :{fr} has synchronous behavior which should make such verification techniques applicable.
+
+
+:cite{CPL; Bracevac:2016:CCL:2889443.2889452} is a calculus to combine multiple services in a type safe manner.
+While CPL does not directly provide fault tolerance automatically,
+it might be used to combine :{fr} applications with other services
+and checking that application level assumptions are not violated.
+
+
+
+## PL View on Lower-level Synchronization
+
+In the area of low-level consistency and synchronization there is research focusing on the language view of properties and guarantees.
+Similar to our work, they to provide guarantees matching the expectations of programmers.
+
+Concurrent :cite{Objects; Filipovic2010} provides objects with serializability and linearizability by guaranteeing that concurrent implementations behave observational equivalent to sequential implementations,
+i.e., matches how programmers expect objects to behave.
+They also want to make concurrency more widely usable by common applications,
+however they do not consider distribution nor fault tolerance.
+
+:cite{Attiya; Attiya2013} argues that transactional memory must integrate both the systems side of view and the language side.
+A complex but efficient implementation should provide same behavior as a simpler implementation of the same high-level API – behavior equivalence should not only exist on the level of low level memory cells.
+This approach is very similar to how :{fr} enforces language level guarantees,
+by managing the lower level runtime systems implementing those guarantees,
+but :{fr} considers distributed systems instead of only local state.
+
+
+
+## Typed Communication Systems
+
+Chandra and :cite{Toueg; Chandra:1996:UFD:226643.226647} describe how failed devices
+are reliably detected in an unreliable network.
+While such a solution does not provide automatic correctness guarantees,
+it could be used to detect permanent disconnects in our system.
+:cite{Verdi; Wilcox:2015:VFI:2737924.2737958} is a system, which uses an implementation
+together with a specification to automatically generate reliable message transfer in case of message loss or reordering.
+However, Verdi does not support use of applications while offline,
+and it does not handle crashes of application.
+Both are limitations stemming from reducing the application model to the sent and received messages without considering their complete execution.
+:cite{style=name; Viering2018} develop a typing discipline to ensure that correctly typed programs,
+will continue correct execution even in the presence of faults,
+but they require a central coordinator – devices disconnected from
+the central system are no longer considered part of the execution.
+
+
+:cite{Function passing; Miller2015} is a style of distributed programming
+that defines a graph of immutable values and operations over these values.
+The result is a graph similar to Spark RDDs, but using arbitrary Scala functions instead RDD transformations.
+However, fault tolerance and reactivity are not part of the paradigm.
+
+
+
+The work on :cite{ScalaLoci; Weisenburger:2018:DSD} addresses
+formal reasoning about the correctness
+of distributed systems with decentralized state. This work
+is orthogonal to ours in two ways.
+First, it addresses correctly typed usage of
+data across the nodes in a distributed dataflow system as an
+orthogonal correctness aspect.
+Second, it does so with an orthogonal
+formal reasoning approach – a static type system.
+Given this orthogonality, it makes sense to combine these two approaches as we did in our case studies.
+

@@ -1,0 +1,443 @@
+== Introduction
+label = chapter-introduction
+
+
+{note=A new platform with new applications.}
+The use of applications has changed together with the underlying computing platform.
+The modern computer is no longer a big piece of office equipment
+that is booted to execute a single task producing a single output.
+Instead, we have many interconnected devices – smartphones, laptops, routers, Internet of Things gadgets, and even some venerable desktop computers we still use to get that heavy work done.
+Furthermore, ubiquitous connectivity with the Internet, and thus collaboration with other people and their set of devices has drastically changed how people expect applications to work.
+
+{note=Define distributed, interactive, and collaborative applications.}
+The core tenets of such applications are dictated by the needs of their users:
+:emph{distribution} because tasks span multiple devices,
+:emph{interactivity} to react to the users and their environment,
+and :emph{collaboration} to facilitate users working together.
+Think about your favorite web-based office suite as an example.
+Distribution exists because of the execution platform.
+Parts of the office application are executed on my smartphone or desktop to provide me with the functionality to edit documents and other parts of the application are executed a server in the cloud to make use of available storage, processing power, and central coordination.
+In general, distribution is necessary because different resources are available on different devices.
+Interactivity exists to serve the user.
+I decide when I edit a document, when I want to share it, or if I want to shut off my computer and do something else.
+The behavior of an application is driven by these external interactions, thus the application must always be ready to react timely and with useful results.
+Collaboration between multiple users requires applications to communicate but also to function independently.
+I want feedback on a document thus I share the document with my reviewer.
+I continue working on the document while my reviewer adds comments and eventually we synchronize our work again.
+For the remainder of this document, we call such distributed, interactive, and collaborative applications :emph{:{apps}}.
+
+{note=App examples.}
+The importance of the niche addressed by :{apps} has been discussed in the literature before:cite{; Zhang2014} and their value to users and companies has steadily increased.
+Users of :{apps} consume, play, create, share, and collaborate on a wide range of digital goods.
+Many users own multiple devices (smartphone, tablet, laptop) and it is important to them to work on any device, share content with other users, and not lose any of their work.
+Companies in all sectors use internal applications to manage their employees, their inventory, and their business processes.
+Due to current trends such as cloud computing, the Software-as-a-Service model, and the easier maintenance model of thin clients (i.e., applications are just websites) many of those internal applications have become :{apps}.
+For companies, it is important that :{apps} are always available to allow their employees to be productive and to not lose data.
+For both users and companies the increase of remote working due to the Corona pandemic will accelerate the trend towards :{apps}, while at the same time diversifying the network and devices that those :{apps} are deployed on.
+Some popular examples of :{apps} that most users know
+include messaging (instant messengers, chats),
+activity streams (social networks),
+data visualization applications (e.g., Calendars, Jupyter notebooks),
+multi-user collaborative applications (e.g., Trello, Google Docs, Microsoft Office),
+and multi-player online games.
+Private :{apps} of companies have less widely known specific instances, but many people have worked with internal room booking, time management, contract management, task planning, resource scheduling, and many other similar systems.
+
+This thesis proposes a programming paradigm to :emph{democratize} the development and deployment of :{apps}.
+
+# Problem Statement
+
+{note=:{apps} are in the FAANGs of others.}
+While :{apps} are very popular, most of the big examples of :{apps} are currently organized and controlled by centralized entities such as Google and Microsoft.
+In many cases, these organizations create both the software and provide their execution environment and data storage.
+With new development in cloud offerings, such as serverless computing, these centralized entities are also trying to seize control over data and applications of companies.
+While we do believe that the trend towards :{apps} is desirable, we wish to avoid the issues and limitations of centralization.
+One issue is the rising concern over privacy as evident through wide-reaching regulations such as the General Data Protection Regulation.
+Another issue is the inefficiency of transferring large amounts of data between the central storage and the user causing latency and making the user dependent on the network.
+Privacy, latency, and reliability will always make it more desirable to keep data as close to the user as possible.
+Moreover, we believe that centralization is detrimental to the usability of :{apps}, because the business model often of centralized services relies on keeping users within their ecosystem.
+Still, many features of centralized :{apps} are useful:
+users and companies wish to have their data processed on more powerful devices than they own and wish to be able to easily collaborate on shared data.
+We believe that users and companies should be free to choose where to store data and where to execute computations, thus allowing them to optimize for their choice of latency, network traffic, reliance on the network, cost, and privacy.
+Others have also noted the need to take back control over data:cite{; GaiaX} and the necessity to free processing of data from vendor lock-in:cite{; DBLP:journals/corr/abs-1909-03026}.
+These solutions focus on data and data processing – solutions we complement by improving the development of :{apps}.
+
+{note=Democratize development of :{apps}.}
+To overcome the issues of centralization we believe it is necessary to democratize the development of :{apps}.
+First, the development of :{apps} must become independent of the runtime providers to solve the issues of centralization and the lack of user choice.
+Specifically, it must become cost-efficient to develop :{apps} whose design is independent of the challenges of the underlying deployment.
+Second, the development of :{apps} must become cheaper – optimally even cheaper than the development of traditional applications.
+The reasoning is that there will be constantly new business use cases and specific user needs that should be addressed by individual :{apps}, but currently the required development resources only make :{apps} for large groups of people profitable.
+
+{note=Introduce programming paradigm.}
+As a means for the democratization, we believe the right choice is a programming paradigm tailored to the development of :{apps}.
+A programming paradigm is both flexible enough to implement diverse :{apps} but also restricted enough to abstract away specific issues and automatically solve challenges faced by :{apps}.
+In the remainder of this section, we discuss the technical challenges faced by :{apps} to understand why existing solutions are insufficient and require reinventing individual solutions for each application.
+
+{note=Programming style challenges exaggerated by connectivity.}
+Developing :{apps} is challenging – even without distribution.
+Their control flow is inverted (“inversion of control”) compared to non-interactive applications, because :{apps} react to external events and have no control over what happens next.
+Reactions are traditionally modeled in some form of continuation-passing style where callbacks are registered to be executed when events happen.
+Designs using continuation-passing style are fragile, hard to maintain, and hard to reason about – bad enough to become known as :cite{callback hell; Edwards:2009:CR:1639950.1640058}.
+Supporting collaboration in :{apps} worsens the problems of callback-based solutions, because instead of a single user interacting with the system there are now multiple users leading to more permutations of interactions that must be handled :cite{Kleppmann2019LocalFirst}.
+In particular, callback-based communication makes handling of
+exceptional conditions and failures during the execution of an application challenging:cite{; Ploski07}.
+
+{note=Distribution and failures.}
+Existing :{apps} have – by necessity – a distributed architecture with some components running on cloud platforms and
+others running on the connected (end-user) devices.
+A distributed architecture – compared to only running locally and accessing remote data, or to only running the application remotely – reduces network traffic, improves latency, enhances privacy, and enables offline usage:cite{; Yu2018EdgeIotSurvey}.
+In turn, however, a distributed architecture introduces several failure modes that need to be addressed.
+First, individual devices may fail: mobile devices running out of battery, mobile and web applications are regularly terminated by the runtime when the user switches context, cloud servers may crash and recover again by restoring persisted state.
+Second, communication between devices may be temporarily disrupted, causing messages to get lost or be duplicated.
+In a distributed architecture, where the control flow is spread across several devices, disconnects and crashes lead to partial failures, where half of an application is still running and the other half is crashed.
+Exposing the reasoning about such a partial failure state to the programmer leads to fragile designs, because it is nearly impossible to manually predict all the possible interactions.
+
+In summary, the challenge with :{apps} is that they combine failure modes of distributed systems, with the complexity of control flow for interactive and collaborative applications.
+To address these challenges a programming paradigm must be able to express reactive control flow in a way that lends itself to automatic fault tolerance.
+
+
+# State of the Art
+
+To get a better understanding of the solution space, we first discuss the state of the art for fault tolerance and for handling interactive applications.
+However, as we will see, there are no solutions that handle everything at once.
+
+
+## Actors-based Programming Paradigms
+
+{note=Actors are versatile, but inconsistent.}
+Actor-based approaches :cite{Agha:1986:AMC:7929,Armstrong:2010:ERL:1810891.1810910, Akkadoc, DBLP:reference/parallel/KarmaniA11}
+are the state of the art in programming :{apps}.
+However, they only ensure fault tolerance of individual actors :cite{Bernstein2014}.
+Communication failures and crashes affecting multiple actors are left to be
+handled by the application logic using only low-level message passing,
+thus merely extending cumbersome and error-prone continuation-passing style solutions.
+Actor supervision only replaces crashed or disconnected actors with fresh instances, but recovery of accumulated local state and synchronization thereof with the overall application state is left to be programmed in user-defined handlers.
+Moreover, there is no automated support for re-establishing application consistency after disconnects.
+Crashed or unreachable actors are replaced by fresh instances.
+By default, they lose any accumulated state in the process,
+but user-defined handlers can be used to, e.g., recover state.
+This must be implemented manually and tailored towards each individual actor, though, and is therefore cumbersome and fragile.
+Orleans :cite{Bernstein2014} addresses this issue, by providing dedicated means for actors to declare persistent state.
+However, application programmers still need to implement when to persist and restore that state so that consistency is upheld.
+There are, indeed, solutions to save the state across an actor restart (e.g., storing state in
+the :cite{Mnesia; Mattsson1998Mnesia} database),
+but state saving and restoration is completely left to the programmer.
+
+
+## Programming Paradigms for Data Processing Applications
+
+{note=Role models for distribution and connectivity.}
+Reasoning about high-level properties of distributed applications when device failure may occur is generally challenging :cite{Gilbert2002}.
+Significant progress is made in this respect for certain types of distributed applications thanks to specialized programming models offering fault-tolerant
+programming abstractions.
+When distributed applications are developed using these abstractions, then the runtime automatically takes care of handling (certain) failure cases for the applications – what we refer to as automatic fault tolerance.
+We look at two common directions for solutions providing automatic fault tolerance.
+
+{note=Clusters.}
+Automated fault tolerance is currently best covered by the approaches targeting
+data streaming and processing on controlled server clusters
+such as :cite{Spark; Zaharia2012}, :cite{Flink; Alexandrov2014TheSP}, and :cite{Kafka; kreps2011kafka}.
+With these systems, developers declare how data should be processed usually in a system specific domain specific language and the runtime then takes of correct deployment of functionality and the management of data regardless of failures.
+These systems typically provide many specific building blocks each tuned for fault-tolerant and efficient execution of a specific task or integration with a specific external system.
+However, for :{apps} these systems have several shortcomings.
+First, these systems focus on applications that process data without user interaction, thus their programming model does not include any way to immediately react to external interactions.
+Seconds, the runtime of these systems must be deployed on a cluster architecture and controlled by a central managing service, thus making it unsuitable for applications running on a user’s device.
+
+{note=LVars and similar language approaches.}
+Another more flexible approach are abstractions for structured data
+:cite{Conway:2012:LLD,Kuper:2013:LLD,Meiklejohn:2015:LLD} which
+restrict the programming model in order to tolerate
+unreliable network conditions (c.f., :cite{CALM; Hellerstein2019}).
+Compared to data processing systems, the building blocks of these approaches are flexible enough to support a wider variety of application use cases, although nothing specific to interactive applications.
+While these solutions can work well, they do not help to build complete :{apps}, because it remains the developer’s responsibility to ensure that combining these building blocks results in fault-tolerant applications.
+
+## Programming Paradigms with Declarative Interactivity
+
+{note=Role models for interactivity.}
+Unfortunately, there is no declarative fault-tolerant solution for the whole spectrum of :{apps}.
+Actors cannot provide the same level of automated fault tolerance as cluster approaches, nor can they automatically connect shared state of multiple devices, because they lack knowledge of the overall dataflow in the application.
+The above approaches with automatic fault tolerance do not target applications, where external events and user inputs determine how computations unfold (inversion of control) and individual application components own data and operate on data independently.
+
+A current declarative approach for designing interactive applications is :cite{functional reactive programming; Elliott:1997:FRA:258948.258973,Cooper2006}.
+Functional reactive programming provides a declarative, modular, and composable programming paradigm:cite{; Salvaneschi2014empirical,Salvaneschi2017empirical} that deals with continuous inputs of new data and events.
+These languages usually sidestep the issue with fault tolerance and delegate the responsibility for handling both distribution and connectivity to the developer and the embedding language paradigm.
+
+However, the declarative nature allows the programmer to state the intent of the application instead of specifying concrete execution behavior.
+Declarative definitions not only improve code clarity,
+but also leave concrete execution behavior unspecified
+– the underlying runtime can freely change as long as the intended semantic is kept intact.
+In our solution we will exploit this freedom provided by declarative programming paradigm to automatically make :{apps} reliable.
+
+The declarative model of functional reactive programming has been used before to automate coordination of message propagation between multiple devices:cite{; Drechsler2014,Margara2014,VanCutsem2007}.
+However, none of the existing approaches provide fault tolerance.
+
+# How to Automate Fault Tolerance for Distributed, Interactive, and Collaborative Applications?
+
+{note=Recap and thesis.}
+For distributed, interactive, and collaborative applications, we lack a declarative fault-tolerant programming paradigm with easy-to-reason high-level guarantees akin to those available for data processing applications.
+The widespread use of some :{apps} (e.g., Google Docs) shows that it is possible to develop correct and useful solutions.
+However, each example is a one-of-a-kind and has to yet again solve the challenges faced by :{apps}.
+We believe that there are many more future use cases for :{apps}, which are currently hindered by the complexity caused by the diverse impact of failures on interactive use.
+We want to empower developers from organizations of all sizes to be able to create reliable :{apps} that solve their users needs.
+Thus, the central question in this thesis is: How to automate fault tolerance for :{apps}?
+
+# Sketch of the Proposed Solution
+
+
+{note=Overview of the upcoming.}
+To answer this question, we present a novel approach to automatic fault tolerance using a high-level programming paradigm.
+Our goal is to provide future developers with a paradigm that reduces the challenge posed by failures in interactive applications similar to how a garbage collector reduces the challenge of managing memory.
+To do so, our programming paradigm abstracts from the notion of changes in data, thus removing the need to handle failure cases differently and providing developers a single set of properties to always rely on.
+Specifically, we propose :{cvtr}, :{rescala}, and :{fr}.
+:{cvtr} refers to the programming paradigm that enhances existing paradigms to be suitable for :{apps}.
+:{rescala} is a library that embeds the :{cvtr} paradigm into Scala – a language that already supports functional and object-oriented paradigms.
+:{fr} is the core calculus that models :{cvtr} and that enables formal reasoning about applications' dataflow within and across individual devices.
+
+## :{cvtr}, the Programming Paradigm
+label = definition-cvtr
+
+{note=Introduce :{cvtr}.}
+To tackle the challenges faced by developers of :{apps}, we design a programming paradigm which provides :emph{convergence, transactions, and reactive abstractions} and refer to this paradigm as :{cvtr} (pronunciation suggestion: :emph{cuter}).
+As a programming paradigm, :{cvtr} determines how applications are designed using convenient abstractions within the limitations of what is efficient and correct on all target platforms.
+Moreover, for such application :{cvtr} automates fault tolerance.
+
+{note=Reactive abstractions.}
+We reinterpret the functional reactive programming paradigm as the development model of :{cvtr}.
+At the core of :{cvtr} is a dynamic :emph{:{flowgraph}} that describes how an application reacts to external inputs.
+Each node in the :{flowgraph} is called a reactive and describes a single reaction.
+A declarative API allow to specify these reactions without implying a global sequential execution as typical in imperative code.
+The resulting declarative specification of the application model provides the runtime enough flexibility to automate correctness without the prohibitive cost.
+
+{note=Transactions.}
+Reasoning about applications with unstructured reactions is hard.
+Thus, transactions allow bundling individual low-level reactions into what a user would consider single operation or unit of change.
+Transactions ensure that all reactions within seem to take effect at the same time, that is, developers never have to worry about intermediate states.
+
+{note=Convergence.}
+Convergence refers to low-latency distributed applications with offline capability and eventual consistency.
+Each device has its own :{flowgraph} and may always execute transactions locally, thus diverging the state in their :{flowgraph}.
+Once two devices are able to communicate, then their states eventually become consistent.
+Using transactions for the granularity of convergence aligns distributed consistency guarantees with user expectations, because transactions represent single logical operations for the user.
+The result is, that while a user may observe effects of a remote transaction in a different order they will only observe all or none of the reactions of a transaction.
+This model of consistency aligns with a natural understanding that things happening far away may require time to become known locally, but once things settle down the world is still in a consistent state.
+
+{note=Fault tolerance.}
+:{cvtr} provides a single set of guarantees that are always provided even when faults occur.
+This simplifies reasoning for users and developers.
+Compared to imperative paradigms fault tolerance can be automatically achieved because it is completely up to the runtime how the reactions described by the :{flowgraph} are executed within the limits of a transaction.
+In addition, it is also up to the runtime when remote transactions are applied.
+Concretely, the :{flowgraph} is enhanced with automated crash recovery of device-local dataflow and enhanced with connectivity to remote devices that tolerates disconnects while providing causal consistency.
+The crash recovery is based on ideas behind consistent snapshots:cite{; Alexandrov2014TheSP} but simplified by the use of transactions.
+The connectivity is based on eventually consistent replicated data types:cite{; Burckhardt2012,Shapiro2011,Guerraoui2016}.
+As a result of the declarative nature of the programming paradigm, our solution relieves programmers of handling intricate details of achieving reliability for :{apps}.
+
+
+## :{rescala}, the Implementation
+label = definition-rescala
+
+{note=Reactive language as solution.}
+:{rescala} as discussed in this thesis is an extension of the core language design proposed by :cite{Salvaneschi2014; style=name}.
+:{rescala} is a fault-tolerant reactive programming language for developing :{apps}.
+:{rescala} has first-class abstractions for
+:emph{events} and :emph{signals} that are concrete instances of reactives in the :{flowgraph}.
+An event is a reactive that produces distinct occurrences of values at certain times, e.g., an event corresponding to an input field produces text when the user submits the input.
+Events can be derived from each other using operations such as filters or transformations,
+and they can be aggregated into signals.
+Signals represent time-changing values, such as the latest text a user submitted.
+Signals resemble spreadsheet cells where
+the value of a cell is derived from the values of other cells
+and a change causes updates of all derived values.
+
+{note=Implementation only features.}
+:{rescala} extends the declarative style of reactive programming with syntax for replicated reactives and developer defined snapshots.
+These extensions are tightly integrated with the local execution of transactions.
+:{rescala} provides application-wide fault tolerance
+with little overhead in terms of both performance and syntactic clutter.
+Furthermore,
+:{rescala} provides language abstractions for propagating and handling errors at the application level to
+enable developers to handle faults when the default behavior of :{rescala} is undesirable and to
+seamlessly integrate application-level fault handling into the :{flowgraph}.
+
+{note=Embedding.}
+Technically, :{rescala} is realized as a shallow domain specific language for Scala.
+Thus, :{rescala} is fully compatible with arbitrary complex domain model expressed in Scala.
+It is fully interoperable with the Scala type system to ensure that the application is consistently type checked across all the programming paradigms available in Scala.
+:{rescala} can be integrated into the APIs of objects in Scala enabling flexible modularization of large applications.
+The computations over domain objects are expressed as ordinary Scala functions with minimal syntactic overhead – additional syntax serves the purpose of making the boundaries between paradigms clear to developers.
+:{rescala} works well with all existing Scala tooling including IDEs, compilers to JavaScript, profilers, testing frameworks, and GraalVM native image.
+
+
+## :{fr}, the Formalization
+label = definition-calculus
+
+{note=What is :{fr}?}
+The goal of :{fr} is twofold.
+First, it provides a core calculus of :{cvtr}, thus providing a precise definition of what the paradigm entails.
+Second, :{fr} is used to state and prove the guarantees of the paradigm.
+:{fr} is defined as an operational semantics that specifies the behavior of :{apps}, their interactions with the external world and the embedding programming language, the process of executing transactions on the :{flowgraph}, and the communication of state between devices.
+
+:% The diverse of possible consistency models:cite{; Aguilera2016TheMF,Finkelstein2009} makes reasoning about application consistency challenging:cite{; Gotsman2016}.
+
+
+# Contributions of this Thesis
+
+The key contribution of this thesis is to demonstrate that automatic fault tolerance can be provided for :{apps}.
+Along the way, this thesis makes several individual contributions.
+We provide an introduction to :{rescala}, its API usage from a developers point of view, the internal design of the system, how it is embedded into existing applications, and how :{rescala} can be extended by developers.
+The implementation supports the development of :{apps} by providing automatic fault tolerance in a distributed setting, abstractions that allow causally consistent connectivity, and a programming paradigm suited for interactive applications.
+
+We formalize the model based on our core calculus :{fr} and prove transactional guarantees for local applications, causal consistency for connected devices, and correct restoration after partial crashes for distributed applications.
+The solutions for transactions, causal consistency, and restoration solve individual issues, but combined provide fully automatic fault tolerance for all failures in our system model.
+
+In the second part of this thesis, we provide a wide range of extensions and use cases for :{rescala} to demonstrate the wide applicability of the programming paradigm.
+ Specifically we include the following extensions and use cases:
+
+• We show that exceptions (in the style of Java) can be seamlessly integrated with the :{flowgraph}.
+• We demonstrate that :{fr} is a suitable foundation to compile a restricted form of a :{flowgraph} to embedded devices. The resulting executable has no additional runtime overhead compared to an imperative implementation.
+• We present an initial prototype for advanced debugging and live programming of :{rescala} applications.
+• We discuss how :{cvtr} both adds a new view on existing research on state-based convergent replicated datatypes (CRDTs) and solves issues with composing multiple CRTDs.
+• We show how to support strong consistency in :{apps} by implementing the Raft consensus algorithm as a replicated data type in :{rescala}.
+
+We evaluate our solution from multiple angles.
+We implement case studies based on common specifications for interactive applications, thus showing that :{rescala} is capable of representing what developers consider typical challenges of interactive applications.
+Our performance experiments show that :{rescala} is fast for non-distributed applications and has comparable performance to available alternatives for applications involving distribution.
+We measure that transactions in :{rescala} have overheads as low as 0.4 μs and application performance is completely dominated by the implementation of the business logic.
+We evaluate the performance
+overhead of providing fault tolerance against crashes.
+The results show that the throughput is reduced by less than :math{20\%} in common cases, which we deem acceptable, especially since most of the cost is related to serializing in-memory data structures for reliable storage, and existing solutions with automatic fault tolerance exhibit a similar overhead.
+We compare the performance of an application implemented in :{rescala} with state-of-the-art solutions.
+The results indicate that performance of connectivity in :{rescala} is dominated by sending network messages, a result we hope to improve by minimizing network messages in the future.
+However, :{rescala} still beats state-of-the-art systems with strong consistency, because eventual consistency removes the need to wait for other devices.
+
+
+
+
+
+
+
+# Thesis Structure and Relation to Published Papers
+
+Research is a collaborative process.
+The thesis supersedes (parts of) existing publications that include the work of co-authors.
+The core of all parts that have been included in this thesis are my own work, but the text, concepts, and solutions have been shaped and improved by my collaborators.
+Thus, I will state which parts have been included from which publication.
+Refer to :ref{Section; section-list_of_publications} an overview of my publications.
+
+The thesis is separated into two parts, the first part – :ref{Chapter; chapter-demonstration} to :ref{Chapter; chapter-project} – introduce the core programming paradigm, its implementation, and formalization.
+Chapters in the first part depend on each other in linear order and form the basis for the second part.
+The second part provides evidence of the wide applicability of the programming paradigm by providing extensions to the core model to support common and specialized use-cases, by providing case studies and experience reports asserting the solution, and by providing empirical evaluation of the performance behavior of the implementation.
+The chapters in the second part can be read in any order.
+
+:ref{Chapter; chapter-demonstration} provides an introduction to developing applications in :{rescala} by example and gives a first glimpse at the syntax used for fault tolerance.
+The examples are a refined version of the introductory examples from prior work:cite{; mogk_et_al:LIPIcs:2018:9206,Mogk:2019:FPM}
+
+:ref{Chapter; chapter-resilient_state} gives a detailed overview of the potential faults and provides a high-level overview and description of how automatic fault tolerance is achieved given those faults.
+The text is an updated version of ideas published at ECOOP:cite{; mogk_et_al:LIPIcs:2018:9206}.
+
+:ref{Chapter; chapter-programming_model} formalizes the programming paradigm and is based on the work published at OOPSLA:cite{; Mogk:2019:FPM}.
+Compared to the high-level introduction, the formalization in this chapter uses a simplified syntax and focuses on the internal concepts that must be understood by developers in order to use the programming paradigm efficiently.
+
+:ref{Chapter; chapter-formalization} states and proves the property of the programming paradigm.
+The proved properties include glitch freedom, maximally parallel execution of transactions, and complete and correct restoration of snapshots.
+These properties are taken from the OOPSLA publication:cite{; Mogk:2019:FPM}, but updated for the changes made to the formalization.
+In addition, we added proofs for causal consistency that have not been published before.
+
+:ref{Chapter; chapter-project} bridges between the formal model and the actual implementation.
+This chapter provides the high-level explanation of the structure of the source code of :{rescala} and how the core packages of :{rescala} interact.
+The concepts are still the same as in the formalization, but the implementation has better modularity, enabling just parts of the system to be replaced.
+Only the description of ParRP in :ref{Section; section-implementation-parrp} is based on published work:cite{; Mogk2015ConcurrencyControlForRP}, but the collaboration with :cite{Drechsler:2018:TRP; style=name} was a strong driver for the design.
+
+:ref{Chapter; chapter-errors_exceptions} introduces error propagation to :{rescala} and thus allows the programming paradigm to be embedded into languages that use exceptions – such as Scala.
+This extension is based in parts on work published at :cite{ECOOP; mogk_et_al:LIPIcs:2018:9206} but has been expanded to include a thorough discussion of alternative designs.
+
+:ref{Chapter; chapter-compilation} describes how the :{cvtr} paradigm can be ahead-of-time compiled to enable the use of the paradigm on embedded devices.
+This work is based on the collaboration with :cite{Sterz2020ReacfiFi; style=name} to which the compiler and language design was my contribution.
+
+:ref{Chapter; chapter-live_tuning} shows the flexibility of :{rescala} by enabling debugging and a limited form of live programming we call live tuning.
+The original implementation of the debugger was done by :cite{Salvaneschi:2016:DRP:2884781.2884815; style=name} but I contributed the support for the debugger in :{rescala}.
+I also contributed the modified version of the debugger supporting live tuning published at the Live workshop:cite{; Mogk:2018:DTL} which this chapter is based on.
+
+:ref{Chatper; chapter-crdts} discusses alternatives and extensions to the replication model that has been introduced in the first part of the thesis.
+In particular, this chapter discusses the challenges faced by alternative solutions to implement :{apps} and why :{cvtr} does not suffer from the same problems.
+Yet, using this analysis we can take many of the advantages of existing ongoing research and apply those to :{cvtr}.
+
+:ref{Chapter; chapter-case_studies} describes several case studies.
+This chapter includes a case study from the collaboration with :cite{Baumgaertner:2019:SSL; style=name}.
+I contributed the implementation and the description of that case study as found in this chapter.
+
+:ref{Chapter; chapter-programming_experience} summarizes our experience with programming using :{rescala} and some similar languages and was first published at the programming experience workshop:cite{; Mogk:2018:RPE}.
+The chapter argues why :{rescala} is such a promising approach to developing :{apps} even when not worrying about faults and contrast various alternative approaches and their shortcomings.
+
+:ref{Chapter; chapter-microbenchmarks} provides performance experiments using :{rescala}.
+This chapter includes reasoning and evaluation that were done in the context of the collaboration with :cite{style=name; Drechsler2014,Drechsler:2018:TRP}, but the content in the form presented here has never been published before.
+
+:ref{Chapter; chapter-related_work} discusses related work. We try to use this opportunity to provide the historic context of the research areas that have influenced our work and that we build on.
+The content is an aggregation of pieces published before, but all the text of the pieces and the resulting overall discussion are entirely my own work.
+
+
+# List of Publications
+label = section-list_of_publications
+
+The full list of publications is as follows.
+All publications have been peer reviewed, though not all of the venues provide a formal publication process.
+The publications are sorted by year ascending.
+
+:raw{tex={ \sloppy \defaultlists}
+
+## Conference and Journal Publications
+
+. :cite{style=inline; Drechsler2014}.
+. :cite{style=inline; Sterz:2017:DTN}.
+. :cite{style=inline; Drechsler:2018:TRP} (Conceptual relations to parts of :ref{Chapter; chapter-project} and :ref{Chapter; chapter-microbenchmarks}).
+. :cite{style=inline; mogk_et_al:LIPIcs:2018:9206} (Chapters :ref{chapter-demonstration}, :ref{chapter-resilient_state}, and :ref{chapter-errors_exceptions}).
+. :cite{style=inline; Mogk:2019:FPM} (Chapters :ref{chapter-programming_model} and :ref{chapter-formalization}).
+. :cite{style=inline; Baumgaertner:2019:SSL}
+  (:ref{Chapter; chapter-case_studies}).
+. :cite{style=inline; Sterz2020ReacfiFi}
+  (:ref{Chapter; chapter-compilation}).
+
+## Workshop Publications
+
+. :cite{style=inline; Mogk:2015:RI}.
+. :cite{style=inline; Mogk:2018:RPE}.
+  (:ref{Chapter; chapter-programming_experience}).
+. :cite{style=inline; Mogk:2018:DTL}
+  (:ref{Chapter; chapter-live_tuning}).
+. :cite{style=inline; Richter:2019:TUU}.
+
+## Abstracts, Posters, and Demos
+
+. :cite{style=inline; Mogk2015ConcurrencyControlForRP}
+(:ref{Section; section-implementation-parrp}).
+. :cite{style=inline; Meurisch:2017:DisVis}.
+. :cite{style=inline; Mogk:2017:PDRP}.
+
+:raw{tex="}"}
+
+
+:raw{tex="\newpage{}"}
+
+# Commonly Used Terms
+
+The terms that are used throughout the thesis are:
+
+• :{cvtr}:
+  The convergent transactional reactive paradigm we discuss in this thesis. Refer to :ref{Section; definition-cvtr}.
+• :{rescala}:
+  Our implementation of :{cvtr} as a Scala domain specific language.
+  Visit :link{www.rescala-lang.com} for the code repository.
+  Refer to :ref{Section; definition-rescala}.
+• :{fr}:
+  Our core calculus. Refer to :ref{Section; definition-calculus}.
+• :{apps}:
+  Distributed, interactive, and collaborative applications. Refer to :ref{Chapter; chapter-introduction}.
+• Flow graph:
+  The conceptual model of applications when using :{cvtr}.
+  Refers to the flow of data between reactives (the nodes of the graph).
+  Refer to :ref{Section; definition-cvtr}
+• Reactive:
+  Abstraction that represent the concept of reactions to some kind of change. Reactives declare what their sources of change are and thus form the :{flowgraph}.
+  Refer to :ref{Chapter; chapter-demonstration}.
+• CRDT:
+  Usually refers to state-based convergent replicated data types. The term may also refer to commutative or conflict-free replicated data types, but we will note if the distinction is important.
+  Refer to :ref{Section; section-crdts-disambiguation}.

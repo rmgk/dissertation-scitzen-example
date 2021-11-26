@@ -1,0 +1,711 @@
+== Case Studies
+label = chapter-case_studies
+
+This chapter presents case studies to discuss the various aspects of :{rescala} in the context of specific problems.
+Our case studies touch on a range of scenarios from traditional client-sever architectures to dynamic peer-to-peer networks.
+Our focus in this chapter is the impact of fault tolerance on the application design.
+
+The TodoMVC (:ref{Section; section-case_study-todomvc}) and Conduit (:ref{Section; section-case_study-conduit}) case studies are implementations of existing interactive example applications – a kind of common benchmark for UI frameworks.
+We chose these case studies, because they provide a fixed set of features that are required by interactive applications.
+Thus, implementing them shows that :{rescala} provides all functionality that the communities around those case studies consider necessary for the development of interactive applications.
+We also use the first case study for a performance comparison with other implementations and show that :{rescala} provides better or comparable performance for the same (or a stronger) guarantees.
+
+The third case study (:ref{Section; section-case_study-street_light}) also involves an interactive application similar to the first two, but the focus is on network communication.
+We dynamically switch between HTTP, WebSockets, or MQTT as the communication protocol depending on their availability.
+The application remains unaware of the underlying network protocol, thus demonstrating the flexibility of the :{cvtr} model regarding different runtime guarantees.
+
+To understand the impact of fault tolerance on the design of applications, we look at :{rescala} case studies that were designed prior to the research on :{cvtr} in :ref{Section; sec:evaluation-conceptual}.
+These case studies are written using reactive abstractions but without concern for distribution and faults.
+We study how the semantics of these applications would change in the worst-case scenario that all reactives are replicated, thus indicating how much additional effort is required to develop applications dealing with faults.
+
+One of the existing case studies is a real-time game, which we discuss in more detail in :ref{Section; section-case_study-error_propagation}.
+Games are a reasonable example for what users expectations are regarding real-time communication.
+Eventual consistency allows one player to make many moves without the other player getting a chance to react.
+Thus, the default semantics of :{rescala} are not appropriate for this domain.
+Instead of eventual consistency, the use experience is improved by notifying the players about network issues and remove disconnected players from the game.
+We use the error propagation mechanism of :{rescala} to add custom error handling to provide such functionality.
+
+
+# TodoMVC Case Study
+label = section-case_study-todomvc
+
+This case study is an implementation of the :cite{TodoMVC; TodoMVC} specification – extended with peer-to-peer data synchronization.
+We first discuss the benefits on the application code when fault tolerance is built into the programming model.
+We then compare the performance of our TodoMVC implementation with two other existing implementations that also add data synchronization between multiple devices.
+
+TodoMVC is a to-do list application that is widely used to compare different languages and frameworks for programming interactive applications.
+The TodoMVC application shows a list of tasks, each representing one to-do item. Tasks can be added, changed, completed and removed.
+At the time of writing, the official website of TodoMVC presents 64 implementations in different languages and frameworks, and many more unofficial implementations (such as ours) exist.
+Synchronization of data across multiple clients is not part of the official feature set of TodoMVC, thus not all implementations support synchronization.
+However, we were able to find two implementations that do support synchronization and use them for comparison to :{rescala}.
+One uses :cite{Twilio; TwilioTodoBlog} to synchronize state with a centralized server, providing strong consistency, but prohibiting offline usage.
+The other uses :cite{Flask; FlaskTodoBlog} to synchronize state with a central server, but does not provide any guarantees, i.e., changes may arbitrarily get lost.
+We discuss the three implementations (ours, Twilio, and Flask) individually before we compare them.
+
+:% The descriptions for this case study are based on the following repositories and commit versions:
+
+:% ``
+:%   https://github.com/rescala-lang/REScala.git
+:%   dfdc54c9c30b9ae6cbfdefa6e6dc8c4544cdde0d
+
+:%   https://github.com/kevinbeaty/flask-todomvc.git
+:%   dd9a7b9f2c992e7b4088662ead1642b56dd51f30
+
+:%   https://github.com/dkundel/todomvc-twilio-sync.git
+:%   a1869b682d7a3dc0386e1f6e30227053cbd34afa
+:% ``
+
+## Our Implementation
+
+To synchronize the full state of the application between devices,
+we implement both the list of tasks and each individual task as a replicated reactive.
+
+::figure{label=figure-case_studies-task_data}
+  ``{label=listing-case_studies-task_data}
+    val taskData =
+      Events.foldAll(LastWriterWins(initial))(current => Seq(:§definition§
+        doneEv >> { _ => current.map(_.toggle()) },:§done§
+        editStr >> { v => current.map(_.edit(v)) }:§edit§
+      ))(uniqueId)
+  ``
+  Implementation of the list of tasks.
+::
+
+Each task has its own “done” button and “edit” input box.
+The done and edit reactives are the inputs from which the task reactive in :ref{Figure; figure-case_studies-task_data} is derived.
+The done state and current text of the task are stored inside a single last-writer-wins CRDT :cite{Shapiro2011} (:ref{Line; listing-case_studies-task_data; line=definition}).
+Tasks are short-lived and we do not expect many concurrent changes, thus we consider the last-writer-wins approach as sufficient even though only the last of any concurrent edits is kept.
+This type of fold reactive definition uses a list of handlers to handle each input individually.
+The task reactive has two handlers: one for the done input in :ref{Line; listing-case_studies-task_data; line=done} and one for the edit input in :ref{Line; listing-case_studies-task_data; line=edit}.
+Both handlers simply modify the state stored inside the last-writer-wins CRDT.
+The UI representing a single task is then derived from this task signal.
+
+
+::figure{label=figure-case_studies-list_of_tasks}
+  ``{label=listing-case_studies-list_of_tasks}
+    val tasksRGA: Signal[RGA[Taskref]] = :§definition§
+      Events.foldAll(RGA(initialTasks)) { tasks => Seq(
+        createTask >> {tasks.prepend}, :§creating§
+        removeAll.event >>> { dt => _ => :§remove_done§
+          tasks.filter(t => !dt.depend(t.contents).done)
+        },
+        tasks.value.map(_.removeClick) >> { :§remove_single§
+          t => tasks.filter(_.id != t)
+        }
+      )}(implicitly, "tasklist")
+  ``
+  Implementation of the list of tasks.
+::
+
+The list of tasks is a single replicated fold that reacts to adding tasks, removing tasks, and clearing all tasks.
+:ref{Figure; figure-case_studies-list_of_tasks} shows the code of the replicated fold reactive.
+The list of tasks is stored as a replicated growable array (RGA :cite{Shapiro2011} in :ref{Line; listing-case_studies-list_of_tasks; line=definition})
+that supports addition and removal of tasks at arbitrary positions and merges concurrent inserts and deletes.
+The fold reactive handles each of the three sources of changes for the list: creating tasks (:ref{Line; listing-case_studies-list_of_tasks; line=creating}), removing all tasks marked as done (:ref{Line; listing-case_studies-list_of_tasks; line=remove_done}), and removing each individual task (:ref{Line; listing-case_studies-list_of_tasks; line=remove_single}).
+This definition of the reactive contains declares both when and how the list of tasks changes.
+We want to stress that in the :{cvtr} paradigm the definition of all reactives always contains the exhaustive reasons of change for that reactive – it thus suffices to reason about single definitions of reactives at a time to understand their full behavior.
+
+
+::figure{label=figure-case_studies-taskcodec}
+  ``{label=listing-case_studies-taskcodec}
+    implicit val taskDecoder: Decoder[Taskref] = :§decoder§
+      Decoder.decodeTuple2[String, TaskData].map { case (s, td) => maketask(td, s) } :§maketask§
+    implicit val taskEncoder: Encoder[Taskref] = :§encoder§
+      Encoder.encodeTuple2[String, TaskData].contramap[Taskref](tr => (tr.id, tr.initial))
+  ``
+  Encoder and decoder implementation for Tasks using Circe.
+::
+
+In addition to :{rescala} this case study requires some other major components.
+The UI implementation is based on :cite{ScalaTags; ScalaTags} for which :{rescala} provides an integration library.
+The network transport layer is based on the work of :cite{style=name; Weisenburger:2018:DSD}.
+In general, the desired type of network communication varies greatly between applications,
+from a web application using JSON messages over WebSockets to a server exchanging binary data on a TCP socket.
+Thus, :{rescala} is independent of the implementation details of the concrete networking used.
+
+An important part for synchronization is encoding of data structures to bytes.
+This part is handled by :cite{Circe; CirceWeb}, which derives codecs of simple data structures automatically.
+Developers only need to manually implement codecs for complex custom data structures, in particular for data structures with nested reactives.
+The list of tasks contains nested reactives (the tasks), thus we require a custom user-defined codec shown in :ref{Figure; figure-case_studies-taskcodec}.
+The encoding is specific to Circe, the used encoding library.
+Circe requires an implicit encoder (:ref{Line; listing-case_studies-taskcodec; line=encoder}) and decoder (:ref{Line; listing-case_studies-taskcodec; line=decoder}).
+We define those by mapping from and to a pair of primitive values – the ID (:code{String}) and initial value of the task (:code{TaskData}).
+The pair can then be encoded automatically because it recursively only contains structured primitive data.
+The decoder (:ref{Line; listing-case_studies-taskcodec; line=decoder}) is used both when restoring a task and also when receiving a new task over the network.
+The :code{maketask} function that is called during decoding first checks if a task with the same ID already exists locally if not simply proceeds with the normal application code that connects the new task with the UI.
+
+
+
+
+## Implementations Based on Twilio and Flask
+
+Both implementations support recovery based on a central server.
+Thus, the application is unavailable when the device is offline.
+The two approaches use different approaches for state synchronization.
+
+The Flask-based implementation replaces the local storage used by TodoMVC with a custom implementation that has a compatible interface.
+The result is that new or modified tasks are individually sent to a central server.
+The server orders all tasks based on arrival time.
+The application only requests state from the server during startup. That is, changes to the to-do list on one device
+become visible on other devices only when the application is restarted.
+Thus, no consistency is provided for the user.
+
+The Twilio-based implementation has its own commercial implementation of a replicated list.
+The list has a primary replica on a central server that ensures consistency of the list.
+However, the replicated list requires local replicas to request confirmation for each change.
+Thus, Twilio ensures consistency at the cost of not supporting offline usage.
+Also, once the Twilio implementation displays more than 50 tasks at once,
+multiple devices become inconsistent when removing tasks,
+most likely due to an implementation bug in the application's UI.
+
+## Integration Effort for Fault Tolerance
+
+We do not want to compare the design of the three implementations, because the other two make no claims about the quality of the application itself.
+However, all three approaches claim that their functionality is easy to integrate into the TodoMVC application.
+There are two types of changes required for fault tolerance.
+The first are using data structures that are suitable for replication, and the second are additional code for network communication.
+We use lines of code as a proxy to measure the effort for these changes.
+While simple length is not a measure of complexity, all changes we find are not complex, but straightforward integrations between the network runtime and the application.
+We thus believe that lines of code is an acceptable metric.
+We also discuss if the additional code could be reused for other applications and what can be guaranteed.
+
+
+Our implementation of TodoMVC consists of 276 lines of code.
+73 of those lines are a custom UI and implementation we added to the case study that enables peer-to-peer connections and does the communication setup.
+This implementation could be shared between all web applications that want to use the same UI and network communication.
+The other two implementations do not have custom UI and use network communication that is built into the used library.
+Most of the remaining code expresses the application logic
+and is not specific to communication or fault tolerance.
+Out of the application logic only 5 lines of code accommodate the distribution of individual tasks by using CRDTs instead of plain data.
+Another 7 lines of code are required for the task list, including
+the custom codec implementation mapping each task to its ID and initial value (shown in :ref{Figure; figure-case_studies-taskcodec}),
+the ID lookup, and the creation of new tasks during decoding.
+The rest of the application automatically reacts to changes from remote devices.
+
+
+The Flask implementation has 268 lines of code.
+The implementation is based on one of the official versions of TodoMVC and only modifies 4 lines of code to
+exchange the local storage back end used by TodoMVC with the one used by Flask.
+However, the storage interface was not designed to support fault tolerance,
+which makes it impossible for the framework to provide synchronization features beyond remote storage in its alternative implementation.
+For example, the local storage API is not designed for values to be changed outside the application,
+thus the API does not provide any means to notify the application of remote changes.
+Even if notifications were available, handling them correctly would require restructuring the rest of the application.
+
+
+The Twilio implementation has 818 lines of code.
+Out of these, 14 deal with authenticating with their central server,
+32 implement routing for callback listeners when tasks are modified,
+and 70 implement the various interactions with the custom API of their distributed data structure.
+This boilerplate code is specific to this application, thus the functionality it supports cannot be easily moved to a library implementation.
+
+
+In conclusion, the main issue we observe is the large amount of boilerplate code of the Twilio implementation.
+The underlying reason is that there are essentially two separate copies of all state in the application.
+One copy is used by the UI to display the current state of the user and the other copy is used by the Twilio library to replicate state to the central server.
+Most of the additional code in the Twilio implementation is then dedicate to ensure that changes applied to one copy are also applied to the other.
+In contrast, in :{rescala} there is only one copy of the state used by both the application and for replication.
+This is possible because we separate the logic for replication from the concrete implementation of the data structure, thus enabling the application to choose whatever data structure is right to represent its internal state.
+
+
+
+## Benchmark Setup
+
+We use the Chromium developer tools (see browser setup in :ref{Section; section-performance-setup-validity})
+to collect performance data
+and use reported script execution time as a measurement of computational overhead,
+and the idle time between events as a measure for network communication latency.
+All network connections happen in a gigabit LAN with less than 1 millisecond latency.
+The exception is the Twilio implementation, which uses its own external commercial service.
+We measured 1 to 2 ms latency to the Twilio cloud front servers, but we have no insight on
+how much network latency their API requests incur internally.
+This setup represents a typical execution environment for :{apps} regarding computational power and platform.
+We minimize network latency as to not hide the overhead inherent to the approach, because both the Flask and the :{rescala} implementations execute a single network message for each operation, thus any latency is simply added to the results of these measurements.
+While we cannot fully control the network conditions for the Twilio implementation, this accurately reflects a fact about using centralized services.
+
+
+::figure{label=fig:evaluation:computation-network-results}
+  ``{converter=tex; template=/templates/formalism.scim}
+    \begin{document}
+    \begin{figure}
+    \centering
+    %trim={<left> <lower> <right> <upper>}
+    %\setlength{\fboxsep}{0pt}
+    %\fbox{
+    \includegraphics[width=.49\textwidth,trim={30mm 184mm 30mm 100mm},clip]{../../../Figures//formalism/computation}
+    %}
+    \begin{minipage}{.5\textwidth}
+      \centering
+    %  \fbox{
+      \includegraphics[width=.98\textwidth,trim={25mm 105mm 30.5mm 113mm},clip]{../../../Figures//formalism/computation}
+    %  }
+
+    \end{minipage}%
+    \begin{minipage}{.5\textwidth}
+      \centering
+    %  \fbox{
+      \includegraphics[width=.98\textwidth,trim={25mm 105mm 30.5mm 113mm},clip]{../../../Figures//formalism/network}
+    %  }
+    \end{minipage}
+    \end{figure}
+    \end{document}
+  ``
+  Time spent on computation (left) and network (right) when adding a new task.
+::
+
+
+
+We study the performance of adding a single new task to task lists of different sizes.
+For :{rescala}, we use a peer-to-peer connection between two devices running the same application.
+Even though :{rescala} does not have to wait for remote confirmation to apply updates,
+we still measure the time until the local device receives a confirmation that the update has been applied remotely.
+:ref{Figure; fig:evaluation:computation-network-results} shows the results of the experiment.
+The :math{x}-axis shows the size of the task list at which the operation happened, and the :math{y}-axis the time taken to add a single new task.
+The left graph shows the time spent on local computations.
+The right graph shows the round-trip time of sending tasks to the remote device, including processing time of the remote device.
+
+## Benchmark Results
+
+The Flask-based implementation has the least computational overhead and the overhead is independent of the size of the list.
+Flask provides no fault tolerance and does not confirm that remote changes are applied,
+thus there is no network overhead to measure.
+The Twilio-based implementation is on the other extreme of the spectrum.
+When making changes, users must wait for both computation and communication to finish, because clients eventually receive a confirmation.
+This approach results in an average of 412 ms until any interaction produces a result.
+Note that the exact numbers heavily depend on a remote system outside our control.
+
+
+In contrast to the Twilio-based implementation, :{rescala} can display changes to user inputs without waiting for confirmation.
+Therefore, changes become visible after 109ms on average, which consists only of computational overhead.
+The computational overhead of :{rescala} grows with the size of the task list
+because the list is stored in a replicated growable array (RGA),
+which has the most overhead of all CRDTs in our implementation.
+Concretely, our RGA implementation has an overhead of 357 bytes for added tasks, and 224 bytes for deleted tasks.
+However, the overhead is independent of the content of the tasks, i.e., of the actual size of application level objects,
+as those are synchronized separately.
+In terms of network communication, waiting for confirmation from the remote device requires a similar amount of time as a local change.
+This is expected, as the remote device mirrors the behavior of the local device before sending the confirmation.
+
+## Benchmark Summary
+
+Our results show that both approaches providing some form of consistency have a negative impact on performance,
+but the performance of eventual consistency of :{rescala} is comparable to strong consistency provided by Twilio.
+This is a very good result given that dealing with unreliable communication and crashes has a significant performance impact in the implementation of :{rescala}.
+Moreover, performance in :{rescala} does not depend on network conditions.
+
+
+The performance of :{rescala} is affected noticeably by the size of remotely shared data, compared to an approach that is independent of data sizes such as Flask. However, this is to a significant extent due the implementation of networking in :{rescala} still being in its infancy, with two obvious major problems.
+First, currently encoding happens independently for snapshots and communication,
+which enables decoupling those features in the implementation, but causes duplicate computation.
+Detailed performance analysis shows that a list of size 100 is serialized in 23ms.
+We can address the problem by encoding each value only once and using it both for the snapshot and communication.
+The second issue stems from the growing state of the RGA that must be serialized for every small change to the list.
+:ref{Chapter; chapter-crdts} discusses how delta synchronization may help to drastically reduce this overhead.
+
+
+
+
+
+
+# Conduit Blogging Application
+label = section-case_study-conduit
+
+The main purpose of this case study is to show how :{rescala} is used to implement a realistically sized collaborative application.
+Similar to TodoMVC, this case study is based on the :cite{RealWorld; RealWorldConduit} set of
+example applications – a specification and a set of implementations for an online blogging application called Conduit.
+
+The Conduit application simulates an online blogging platform where users can write articles, comment on these articles, read articles, and see various lists of articles (by user, by tag, by recency, etc.).
+Additionally, there are incidental features to allow registering new accounts, log into the system, and edit a user profile.
+Conduit is specified informally with examples and templates.
+The application is separated into the front end, the back end, and the API between those two.
+
+:% Note the following sources:
+
+:% ``
+:%   https://github.com/gothinkster/realworld#frontends
+:%   https://www.freecodecamp.org/news/a-realworld-comparison-of-front-end-frameworks-with-benchmarks-2019-update-4be0d3c78075/
+:% ``
+
+
+We call our implementation of the case study Reconduit.
+It is a self-contained implementation of the front end and connects to existing back ends.
+Reconduit realizes the full specification of the client application – including navigation, multiple documents, and user accounts.
+The Conduit client specifies a custom protocol to interact with the server that our implementation has to interact with, thus exemplifying the ability of :{rescala} to interact with existing application code.
+In addition, Reconduit supports offline use with a limited feature set (no downloads of new blog posts, no creation of accounts).
+
+Reconduit has several views such as composing articles, reading articles, filtering by tags, or editing the profile.
+Each view corresponds to a single page of the web application and makes use of a subset of the shared content data such as articles, the currently used account, and comments.
+The original Conduit application fetches this data from the server on demand thus causing latency.
+In Reconduit the content data is mirrored locally and updated by background tasks whenever the user is online.
+Because views are derived from the content data reactives content is visible immediately when the application starts – even when offline – and us updated dynamically when a connection to a back end is available.
+
+Web applications such as Conduit are typically developed in a mix of HTML and JavaScript.
+For :{rescala} applications, we instead use our integrations with :cite{ScalaTags; ScalaTags} to generate HTML and :cite{ScalaJS; ScalaJs} to compile to JavaScript.
+Thus, the complete application is written as a single :{rescala} application.
+There is no need to combine templates for HTML generation with any generated boilerplate to include the application logic.
+Compared to application frameworks that provide similar features to :{rescala} – such as automatic updates, state restoration, and communication – :{rescala} does not require learning new concepts specifically to web applications.
+Instead, we can reuse existing technologies for web development, because reactives are flexible enough to both express the application logic of the Conduit specification and integrate with external libraries.
+
+Our language-based approach allows us to use the type and object system of Scala to structure the application.
+Applications such as Conduit have multiple views that a user may interact with at different times.
+For example, there is a list of blog post in summarized form with metadata and a full standalone page for each post.
+Each view is represented as an independent module.
+:{rescala} fills the gap when modules are composed to enable consistent transactions from one view to another and to represent the same data in multiple views consistently.
+Continuing the previous example, the state of the blog post is managed by :{rescala} and the two views of the post are guaranteed to always display the same version.
+
+Deriving each view from a single point of truth instead of individual pieces of state results in more polished experience for the user with less effort required from the developer.
+In the main Conduit implementation – which does not follow such a strategy – we could identify a case of inconsistency between views in the default implementation of Conduit with only manual testing.
+Of course, that Conduit implementation is only meant to demonstrate development methodology, thus only a moderate amount of effort is spent on finding bugs and usability, but that is why the programming paradigm should prevent such issues by automatically.
+
+Another point is consistent restoration.
+The Conduit specification does not specify what the application state should be when the application is restored.
+The typical user expectation for a web application is that the view corresponding to the current URL is shown again when visited.
+For many other Conduit implementations there is only a very loose relation between the current URL and the current view.
+In contrast, the :{rescala} implementation simply stores the application state representing the current view inside the URL as part of creating a snapshot.
+Thus, it is automatically ensured that the URL and the application state are always consistent.
+This, again, does not require developers to understand any specific framework and works by flexible use of existing :{rescala} features.
+
+Finally, the :{rescala} implementation enhances the Conduit application with offline usage.
+In addition, :{rescala} provides the infrastructure for users of the application to directly exchange blog posts.
+However, while peer-to-peer communication is technically feasible, it is unclear if it is desirable for such a website to allow spreading of content without the ability of (central) moderation.
+Integrating authentication and content filtering inside a CRDT is an interesting future direction for research, but outside the scope of this thesis.
+
+In conclusion, the Reconduit implementation together with the TodoMVC implementation increases our confidence that :{rescala} is widely applicable to typical problems in the area.
+We find that :{rescala} integrates well with existing libraries for specific environment – such as HTML, storage back ends, and existing remote APIs.
+We never encountered issues with application logic that could not be expressed with :{rescala}.
+Moreover, even if automatic guarantees are not required by the specification they enhance user visible parts of the application behavior such as offline usage and consistent behavior of different parts of the application.
+
+
+
+# Smart Street Light Citizen Application
+label = section-case_study-street_light
+
+The smart street light and the companion application for citizens are part of a demonstrator for the :link{EmergenCity; https://www.emergencity.de/} project.
+The functionality of the application includes browsing news and sharing pictures.
+Our citizen application is based on web standards similar to the previous case studies, enabling a zero-installation distribution on all current citizen devices.
+Maximum compatibility and zero-installation are important requirements for our use case, to ensure that the application is available to every citizen in case of a crisis.
+
+Our case study uses the following features of the smart street light: a Wi-Fi access point to connect to citizen devices and other nearby street lights, a wired connection to the internet, and various environmental sensors to enable autonomous detection of emergencies.
+Other features of the smart street light that are not directly relevant to our case study include illumination of the surrounding area.
+
+The behavior of the companion application dynamically changes parts of its behavior depending on the available communication infrastructure and emergency status.
+The application has the goal of providing useful information over the internet to citizens during normal operations in “everyday mode” and to seamlessly switch to alternative communication channels in “emergency mode”.
+
+
+## Everyday Mode
+
+During everyday mode, the example application connects to a city-wide central server to acquire a feed of local information.
+We use city-wide news – similar to RSS or local Twitter feeds – as an example. Information can further include city-wide traffic information, public transport, availability of services such as bike-sharing, and other services of the digital city.
+Providing functionality for the everyday mode is necessary to give citizens a strong incentive for already using the application before a crisis, to ensure they are familiar with its usage, and to make it readily available.
+We use a client-server topology for the everyday mode to ensure low latency of updates, high quality of the provided information, and low communication overhead.
+
+
+## Emergency Mode
+
+The application switches to emergency mode, when instructed to do so by the crisis detection mechanism of a local smart street light, or when the application itself encounters permanent connection issues attributed to an emergency situation.
+To synchronization replicated reactives during an emergency, the application on citizen devices connects to the local access point of nearby street light and directly to other citizen devices if possible.
+The exchange of information is no longer just between the central service and the end user devices, but the device start exchanging information with the smart street light in both directions.
+That is, both the citizen device obtains updates from the smart street light and the street light is updated by the citizen device if the device has newer information.
+The smart street light relays such information to other connected devices.
+The reason for bidirectional communication in a crisis situation is that only a few mobile phones may still enjoy connectivity to a cellular network to receive new information.
+In such a situation, the one connected device provides new information to the local streetlight and thus other nearby devices.
+
+In addition to bidirectional communication with the street light individual devices opportunistically establish direct connections with other local devices to ensure that communication does not rely on the availability of the smart street light.
+From the application developers point of view all changes from the outside appear as changes to the respective replicated reactives.
+The uniformity alleviates application developers from the burden of developing, testing, and maintaining different applications for everyday and emergency mode.
+
+The application may additionally provide functionality specific for emergency use cases.
+The emergency state itself is simply another source reactive that is updated by the network runtime developed for this emergency scenario.
+As an example for extended functionality, instead of only consuming information about the city and current situation, the application enables citizens to directly communicate with other citizens in the vicinity and with first responders during emergency situations.
+Citizens may locally disseminate information that is highly relevant for their current area (e.g., the location and the nature of emergency sites, or where help is needed or available) and which can no longer be made available through a central server due to the collapse of everyday communication infrastructure.
+To stop the network from overloading, user generated information is only disseminated from the source to directly connected devices, but those devices do not automatically propagate the information further.
+However, first responders have special permissions to share global information, which is distributed from application to application using any of the aforementioned communication channels.
+
+
+
+## Deployment and Network Runtime
+
+
+The application is deployed via HTTPS using Web technology available on all common citizen devices.
+With a typical application size of less than 1 MB it is feasible to deploy the application over mobile networks.
+The application code can also be acquired directly from the smart street light.
+Technical advanced users are able to share the application directly from device to device using any ad-hoc communication channel still available during the emergency.
+
+::figure{label=fig:application:communication-diagram}
+  ``{converter=tex; template=/templates/tikz.scim; maxwidth=0.8}
+    \input{../../../Figures//Studies/app.pdf_tex}
+  ``
+  Communication in our network runtime.
+::
+
+This case study uses a custom network runtime for communication.
+The runtime abstracts over the concrete used protocol – WebSockets for communication with the central server, WebRTC for communication between citizen devices, and MQTT for communication with the smart street light.
+Due to the flexibility of replicated reactives the only requirement of a network runtime is to deliver some messages – there is no need for the runtime to ensure delivery or order messages.
+Thus, it is easy to customize the network runtime to specific use cases, because most existing protocols can be directly used without requiring additional ordering or delivery guarantees.
+
+Figure:ref{; fig:application:communication-diagram} shows an example message flow of the deployed application.
+First, communication happens via a central server where the city sends messages to the street light that are forwarded to the citizen application.
+When an emergency occurs and messages form the city no longer reach the street light, then citizen devices start communicating directly with each other.
+
+We limit potential abuse for communication by only automatically forwarding messages from known participants, such as first responders.
+These known participants are determined by pre-shared public keys acquired during everyday operations.
+Other messages must be reviewed by the current user of the device to be forwarded to other devices.
+
+In general, emergency mode requires additional resources as compared to everyday mode, such as storage and network from the devices of citizens,
+because those devices have to replicate some of the unavailable infrastructure.
+However, we only assume emergencies to last for a short time, a couple of days at most, after which normal operations resume, and additional resources are freed again.
+
+## Evaluation of Network Overhead
+
+::figure{label=fig:evaluation:application}
+  :image{maxwidth=0.7; /Figures/Studies/app-empirical-fixed.pdf}
+
+  Round trip times and message sizes for increasingly more messages.
+::
+
+We evaluate our citizen application with respect to message sizes and message delays in Figure:ref{; fig:evaluation:application}.
+We start at 10 news articles (number of messages) and continually add messages to the shared state of the application.
+We measured the time it takes for a single remote mobile device to acknowledge that a new article was received, processed, displayed to the user, and forwarded to other devices in the network.
+The combined time (round trip) of these operations stays under 100 ms during our measurements, and most of that time is spent on actually processing the messages.
+Due to the way synchronization of our infrastructure works and to ensure that all participants eventually have all state available, message sizes continually grow when more state is added.
+This size can be reduced by purging old messages, e.g., once they become irrelevant because they are out of date.
+
+## Conclusion
+
+The requirements of the emergency scenario are unusual,
+because there is a conflict of interests between developers that may not want to spend effort testing and developing for emergency scenarios due to the high cost and citizens that depend on applications during an emergency.
+Thus, we do believe that programming paradigms with automatic fault tolerance such as :{cvtr} provide a workable compromise in such situations – developers have no additional cost while citizens do gain additional reliability.
+Furthermore, we as the designers of :{rescala} only have to consider a new scenario such as the emergency scenario once and there is no additional cost for each application.
+
+
+
+
+# Influence of Fault Tolerance on Legacy Applications
+label = sec:evaluation-conceptual
+
+
+:{rescala} has a number of case studies that investigate how to improve the design of interactive applications compared to solutions using imperative paradigms – especially compared to the observer pattern:cite{; Salvaneschi2017empirical}.
+However, none of these case studies were designed with consideration for faults.
+Using the assumption that those applications are well-designed for systems without faults, we analyze the impact of faults on the behavior of applications.
+To be clear, fault tolerance in :{rescala} is fully automatic, but these applications may rely on the assumption that transactions are executed sequentially.
+This assumption is not true for replicated reactives.
+For this experiment, we analyze the case studies under the worst case assumption that all sources and fold reactives no longer execute transactions sequentially, but instead arbitrarily merge and reorder transactions.
+Our claim is that the changed assumption – no sequential execution of transactions – only has minimal impact on existing applications implemented with :{rescala}.
+Thus showing that applications are automatically made fault tolerant.
+To validate this claim, we answer the following research questions:
+
+• RQ1:
+    To what extent do snapshots and restoration affect the application syntax and semantics?
+• RQ2:
+    To what extent does the integration of replicated signals
+    into the :{flowgraph} affect the application syntax and semantics?
+
+To answer these questions, we analyze a set of case studies, consisting of ten applications (including games, simulations, and GUI applications) and five integrations with external libraries (e.g., an API to access the HTML DOM, bindings for JavaFX and for Java Flow),
+comprising a total of 13.000 LoC (counted with :link{CLOC; cloc.sourceforge.net} excluding comments and blank lines).
+The case studies are listed in Figure :ref{table:evaluation:counted-occurences} and their code is publicly available from the :{rescala} :link{webpage; www.rescala-lang.com}.
+
+
+::figure{label=table:evaluation:counted-occurences}
+  :image{converter=tex; template=/templates/formalism.scim; /Figures/faults/evaluation-table.tex}
+  Possibly problematic operators in case studies and extensions.
+::
+
+
+## (RQ1) Effects of State Snapshotting/Restoration on Application Semantics
+
+Snapshotting is invisible to an application,
+since snapshots are automatically created at the end of a transaction.
+Restoration, on the other hand, is visible to the application,
+since restoration re-executes the application to restore the :{flowgraph} (cf. Section :ref{sec:snapshot-observers-invariants}).
+The value of signals may differ between its first (normal) start and a restoration,
+causing different application behavior.
+Furthermore, certain inputs to the :{flowgraph} may be duplicated while restoring.
+For example, if a calendar application were to add a new calendar entry every time it starts, then this new entry would be duplicated when the application is restored.
+We refer to problems with different behavior during restoration as :emph{restoration inconsistency}.
+
+To quantify the extent of restoration inconsistencies,
+we inspect all input and output interactions of imperative code with the :{flowgraph} in our case studies.
+These interactions are easy to localize, since they occur via a well-defined interface of the :{flowgraph},
+consisting of the operations :code{fire} and :code{observe}.
+The columns for :code{fire} (input interactions) and :code{observe} (output interactions) of
+Figure :ref{table:evaluation:counted-occurences} summarize our findings.
+
+Firing events on some occurrence in the external world via the :code{fire}
+operations serves the purpose of entering new values into the :{flowgraph},
+e.g., a user clicking a button, time passing, or receiving a network message.
+In our case studies, 180 out of 187 :code{fire} calls serve such a purpose
+and
+are not affected by state
+restoration.
+The 7 remaining calls that do exhibit the restoration inconsistency problem
+are instances of the same event usage anti-pattern:
+they incrementally build state during application startup.
+For example, the Pong game initializes the UI elements,
+and adds them one by one to a list of all UI elements, as shown below.
+As a result, this list would grow after each restoration.
+
+``
+  val addElement = Evt[UIElement]
+  val allUIelements: Signal[List[UIElement]] = addElement.list()
+  addElement.fire(ball); addElement.fire(player1); ...
+``
+
+Firing of events must not be misused for
+initializing reactives.
+Manual inspection of usages of the :code{fire} method is required to find such misuses.
+
+We analyzed if
+:code{observe} calls on signals cause inconsistencies during restoration.
+We found a total of 10 usages of signal observers in the case studies.
+Event observers are more common with 150 usages, but are never triggered during restoration, thus never cause inconsistencies.
+Out of those 10 signal observers, 9 are not affected by restoration inconsistencies.
+7 of them are in bindings for external libraries
+and are used to set properties of UI toolkits, e.g., the window title as in :code{titleText.observe(UI.window.setTitle)}.
+Triggering these observers during restoration correctly causes the UI to display the restored state.
+Two observers execute cleanup code, which is not affected by restoration either.
+The only observer that is affected by restoration inconsistency is in a simulation application (:code{Universe} row in Figure :ref{table:evaluation:counted-occurences}).
+The simulation uses
+mutable state outside :{rescala},
+and if a fault occurs during a simulation step, this state is not restored.
+
+
+We conclude that the state snapshotting/restoration feature of our approach
+operates mostly transparently.
+This means: (a) most of the potentially problematic interactions
+(181 out of 189, roughly 96%) are unproblematic in our fault-tolerant runtime, (b)
+the few problematic cases can be avoided,
+if application developers use the correct APIs of the :{flowgraph},
+and ensure that mutable state outside :{rescala} is also able to tolerate faults.
+
+## (RQ2) The Effect of Introducing Eventually Consistent Updates
+
+Eventually consistent updates may affect the behavior of existing applications in two ways.
+First, they break the invariant
+that each occurrence of an input :code{Evt} is handled individually.
+Instead, after devices were disconnected for a while,
+all changes are replicated as a single large change to other devices.
+These combined changes cause problems when the application expects each change individually,
+e.g., if our shared calendar were to display a notification each time an entry is added,
+the notification may be triggered for a group of entries, instead of each individual entry,
+and as a result, the notification system has to be able to handle multiple entries at once.
+
+Second, they break assumptions that usages of the :code{change} operator on signals may make
+about its behavior.
+The :code{change} operator is used to reify and handle each individual change of a signal,
+and usages of :code{change} may assume that every
+intermediate change of the signal will occur individually.
+However, with eventual consistency intermediate changes may be grouped as described above,
+hence, assumptions on individual changes become invalid.
+For illustration, consider a simple clock implemented as below.
+The computation of :code{minute} relies on :code{second} change to 0.
+However, with eventually consistent propagation :code{second} could
+change from 59 to 2 skipping the intermediate step, because an aggregated update is received over the network,
+resulting in a missed minute.
+
+``
+  val tick: Event[Unit] = ... // fires once per second
+  val second = Signal { tick.count() % 60 }
+  val minute = Signal { seconds.change.filter(_ == 0).count() % 60 }
+``
+
+
+
+To quantify to which extent the
+introduction of replicated signals affects the application semantics due to the existence of
+:code{change} operations on signals, we investigate
+whether the semantics of our case studies relies
+on each individual signal change being visible, as opposed to
+relying on a notification about its latest change.
+The results of this analysis are shown in the :emph{change} column of
+Figure :ref{table:evaluation:counted-occurences}.
+Roughly 46% of :code{change} operators (38 out of 82 in 7 out of 15 case studies)
+have different behavior when individual changes are grouped or skipped due to eventual consistency.
+The results indicate that replicated signals with eventual consistent semantics
+cannot be introduced transparently, which, in fact, is not surprising.
+However, there are several mitigations depending on the needs of the application.
+The first is to keep computations that require strong consistency on a single device, and only distribute their results via replicated signals.
+Second, as discussed in :ref{Section; sec-paxos_as_crdt}, it is possible to use a CRDT implementation that does provide strong consistency on the application level.
+A custom replicated data type allows applications to decide their own requirements.
+Third, the application logic may be slightly rephrased to accommodate for unordered transactions.
+For example, the time management above could derive the current minute directly from the counted ticks (using :code{tick.count() % 3600}).
+
+
+# Error Propagation and the Pong Case Study
+label = section-case_study-error_propagation
+
+We use the Pong case study – a simple multiplayer game – to discuss the error propagation as discussed in :ref{Chapter; chapter-errors_exceptions} on a concrete example.
+The classic Pong game requires real time communication to provide an enjoyable experience, thus the application is not suited to the default strategy of eventual consistency in :{rescala}.
+Our version of Pong supports an arbitrary amount of players, and we want any disconnected players to be removed from the game until they reconnect.
+
+The integration of error propagation into transactions allows propagating errors mostly transparently.
+Additional code is required only at specific places where the developer wants to handle errors.
+The key point is that intermediate reactives do not have to be updated to propagate the error,
+minimizing the total amount of application code that requires modification.
+Especially important to us is that error propagation does not “pollute”
+application code and instead only requires changes directly necessary to improve the user experience.
+
+::figure{label=fig:evaluation:pong-example-recover-graph}
+  :image{maxwidth=0.75; /Figures/Graphs/pong-example.pdf}
+
+  Recovering from errors in Pong.
+::
+
+The case study consists of two application windows, one for each player.
+Without handling faults, if one player dropped, the game would get stuck or simply terminate.
+Figure :ref{fig:evaluation:pong-example-recover-graph} shows an abstract
+representation of the :{flowgraph} of the case study.
+Altogether, we update the game at three locations
+out of the 250 total LoCs.
+To evaluate error handling in :{rescala}, we added functionality to allow players to leave and join the game.
+When a player disconnects, an error gets inserted into the position signal of the
+racket of that player:
+
+``
+  UI.onClose{ Racket.pos.admit(PlayerDisconnected)  }
+``
+
+Following the dataflow of :code{Racket.pos} through the :{flowgraph} of the application,
+one can identify the places where the error needs to be handled.
+There are two such locations:
+when displaying the players on the screen and inside the game logic handling cleanup of data structures for disconnected players.
+
+For handling the error when displaying the players,
+we reused an existing try/catch block that handled missing game objects and
+added a handler for the :code{PlayerDisconnected} exception.
+Note that handling the disconnected event may require a different handler if the game should support different failure modes than just removing the player.
+
+``
+  case _: NoSuchElementException |  _ : PlayerDisconnected =>
+  // remaining handler unchanged
+``
+
+As a final modification to the code, failed connections are observed and the corresponding player is removed from the game.
+To remove the player, a list of disconnected players is derived from the list of players, by filtering on the player connection:
+
+
+``
+  val disconnectedPlayers = Signal{ players.value.filter { p => Try(p.connection.value).isFailure} }
+  disconnectedPlayers.observe(Game.removePlayers)
+``
+
+If accessing the connection raises an error (checked with :code{Try(...).isFailure}), then the player is considered disconnected.
+The resulting list of failed players is observed and these players are removed from the game (closing the connection and updating the list of players).
+
+Error propagation in Pong is particularly effective, because the application was already able to handle a dynamic amount of players, thus errors could reuse existing handling logic.
+Still, this shows that the error propagation enables errors to be handled at the specific place where there is enough information to do so.
+In addition, the case study clearly demonstrates the advantage of integrated error handling, when most of the application is not concerned with errors and thus does not need to be changed.
+Finally – while we believe causal consistency to be better suited for :{apps} compared to explicit error handling – applications with some form of real-time requirement or other reasons that causal consistency is unsuited can take advantage of the option for manual error handling.
+Thus, error propagation does widen the applicability of :{rescala}.
+
+# Conclusion
+
+Our case studies repeatedly show that :{rescala} is very well suited to implement :{apps}.
+The provided abstractions are sufficient to model complex application logic, the resulting application code is easy to reason about, and provides automatic guarantees for fault tolerance.
+
+Performance of :{rescala} has never been an issue in any of our target applications, however, our results indicate that encoding application state into bytes for storage or synchronization will likely be the first bottleneck.
+Potential improvements include more efficient codecs:cite{; JsoniterBenchmarks} and ubiquitous use of delta encoding for all state (see :ref{Section; section-crdts-delta_replication}).
+It is possible that future work can achieve better performance in these cases by integrating the data representation tightly into the programming paradigm, instead of delegating this to external implementations as is currently the case.
+
+We have also shown that it is not necessary for developers to only use :{rescala} to implement an application.
+Most case studies are implemented in other paradigms to some extent, enabling developers to choose whatever paradigms fits the application.
+

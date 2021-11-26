@@ -1,0 +1,428 @@
+== Experience Using REScala
+label = chapter-programming_experience
+
+The reactive part of :{rescala} is based on a long tradition of (functional) reactive programming (:{efrp}) and in this chapter we informally summarize our high-level experience using the paradigm.
+In general, :{efrp} is a paradigm that aims to expressing time-changing, interactive applications in purely functional languages.
+:{efrp} has been :cite{studied intensively; Elliott:1997:FRA:258948.258973,Czaplicki2013,Cooper2006,Wan2000,Hudak2003,Elliott2009,Drechsler2014,Nilsson2002,Peterson2000,Ploeg2015,Sculthorpe2009,Salvaneschi2014empirical,Salvaneschi2017empirical} and has spread from the
+original purely functional setting into imperative
+and object-oriented languages:cite{; Salvaneschi2014,Courtney2001,Boix2013,Meyerovich2009}.
+
+However, only little literature exists on developing applications in :{efrp} beyond the small case studies used to exemplify or evaluate each new :{efrp} language (similar to our contributions in :ref{Chapter; chapter-case_studies}) and an :cite{empirical study; Salvaneschi2017empirical}.
+Thus, not much is known qualitatively about the programming experience with :{efrp}.
+This makes it hard to evaluate if a :{efrp} language fits a specific domain, to compare different :{efrp} language designs, or even to build knowledge about recurring problems when developing with an :{efrp} language.
+
+
+
+
+Over the years, several people have used and contributed to :{rescala}.
+We derive the insights discussed in this chapter from personal discussions with those contributors, inspecting contributed code, and our own experience from using :{rescala}.
+A detailed list of contributors can be found in the :{rescala} :link{repository; https://github.com/rescala-lang/REScala}.
+
+We first discuss common idioms and patterns and then discuss what influence our findings have on the design of :{efrp} languages.
+For idioms and patterns, we investigate usage experience with patterns emerged when using :{efrp} both in a purely functional setting and when including :{efrp} as part of imperative applications.
+For the language design, we report on our experience with :{rescala} specifically,
+both as users and developers of the language,
+to provide insights on how choices in the :{efrp} language design
+influence its use in reactive applications.
+We believe that sharing our experience
+helps researchers to understand how :{efrp} is used effectively.
+It also guides developers to decide whether :{efrp} is applicable in their domain,
+and it supports designers of :{efrp} languages considering design trade-offs.
+
+
+
+
+# Idioms and Patterns
+
+Certain idioms and patterns seem to reoccur in reactive programs,
+and we elaborate how they help
+with maintainability and testing of :{efrp} applications.
+
+
+
+## Idiomatic Code
+label = rq:idioms
+
+As every programming paradigm, :{efrp} has a specific coding style that takes time to learn and refine.
+Developers with an imperative background
+perform side effects on shared state rather than opting for functional processing of event streams.
+For example, to count how often an event is fired,
+a mutable variable is updated inside a :code{map} expression,
+and the value of the variable is propagated:
+
+``
+  var count = 0
+  val mapped: Event[Int] = event.map { _ =>
+    count += 1 // bad: mutation inside operator
+    count
+  }
+``
+
+However, mutations of :code{count} outside the user-defined function for the :code{map} operator are propagated.
+The idiomatic REScala solution is to use :code{fold},
+an operator with internal state managed by the reactive language,
+that applies a user defined function
+to generate the new state from the old state:
+
+``
+  val counted: Signal[Int] =
+    event.fold(0) { (count, _) => count + 1 }
+  // or just `event.count`
+``
+
+In our experience, fold is adequate to model any stateful computation,
+but it requires programmers to understand purely functional state management
+(e.g., using the accumulator and return value to manage state).
+In some cases, it is necessary to handle multiple events
+in the same :code{fold} to make the state accessible to all event handlers.
+Examples are user interfaces, where a user modifies the same value by entering text, or dragging a slider.
+Our case studies include an example where an elevator computes the time it has spent waiting on the current floor,
+depending on a :code{reachedFloor} event, which resets the value, and a :code{tick} event, which increases the value:
+
+``
+  val waitingTime: Signal[Int] =
+    reachedFloor.reset(0) { _ =>
+      tick.iterate(0) { acc =>
+        if (isWaiting()) acc + 1 else acc
+    }}
+``
+
+The code above requires a nested call of :code{iterate} inside a :code{reset} both of which have semantics derived from fold.
+Nesting complex operators is potentially hard to understand even for seasoned :{efrp} developers.
+Fortunately, there is a more idiomatic alternative when folding
+over multiple events.
+REScala supports an extended syntax for folds,
+which takes a list of events and associated update functions,
+to compute the next state from the current one:
+
+``{label=line:extended-fold:}
+  val waitingTime: Signal[Int] =
+    Events.fold(0)( acc => Seq(
+      reachedFloor >> {_ => 0},  :§patterns§
+      tick         >> {_ => if (isWaiting()) acc + 1 else acc }
+    ))
+``
+
+The extended fold
+states the intention more clearly.
+Each event is paired with a handler function (:ref{Line; line:extended-fold:; line=patterns})
+describing the behavior of the fold when the corresponding event occurs.
+The :code{reachedFloor} resets the state to one,
+and :code{tick} increments the state by one
+if the elevator is currently waiting.
+When multiple events occur at the same time,
+the handlers are executed from top to bottom.
+
+While this is only an anecdotal observation derived from our experience with the case studies, the correct use of fold seems to be a common problem when developers with an imperative background write applications with :{efrp}.
+However, developers seem to know that mutable state is problematic and they try to use :code{fold},
+but they often end up with complex and hard to understand :code{fold} expressions.
+We believe the issue to be a lack of available
+examples and references for writing readable complex fold expressions.
+
+
+
+
+## Maintenance
+label = rq:maintenance
+
+For maintainability, we want to highlight one crucial part of :{efrp}:
+statically known dependency relations with automatic update propagation.
+As a contrived example – for the sake of brevity –
+consider a door system that imperatively turns the lights on or off,
+when the doors open or close:
+
+``
+  var light = On
+  object DoorSystem {
+  	def onClose() = { light = Off }
+  	def onOpen() = { light = On }
+  }
+``
+
+Other objects rely on the state of :code{light}
+and must be notified when it changes,
+but the API does not specify how notifications happen.
+With :{efrp} dependencies are made explicit,
+and notifications happen automatically:
+
+``
+  object DoorSystem {
+  	val closed: Signal[Boolean]
+  }
+  val light = Signal {
+  	if (DoorSystem.closed()) Off else On
+  }
+``
+
+In the updated example,
+the :code{closed} state of the door is a proper part of the public API of the :code{DoorSystem} object,
+including the fact that the state changes over time.
+The example generalizes to bigger projects.
+:{efrp} operators integrate seamlessly into existing APIs,
+and work with existing tools: the type system, IDE-based refactoring, linters, etc.
+
+
+
+
+
+## Testing with Reactive Programming
+label = rq:testing
+
+Our experience with testing in the cases studies is limited to unit tests.
+We observed no particular difficulties:
+Testing :{efrp} is not different from testing code in the object-oriented paradigm.
+:{efrp} operators are tested at a similar granularity as method calls,
+and tests exercise the operators and observe the resulting values,
+using imperative accessors.
+For events, it is often useful to use the :code{list} operator
+(Lines :ref{line:testing:; line=list1}, :ref{line:testing:; line=list2})
+to make all occurrences of the event accessible as a list:
+
+``{label=line:testing:}
+  val input = Evt[String]
+  val greeting: Event[String] =
+    input.map(name => s"Hello $name")  :§map§
+  val inputLog: Signal[List[String]] =
+    input.list()  :§list1§
+  val greetingLog: Event[List[String]] =
+    greeting.list()  :§list2§
+
+  assert(inputLog.now == Nil)
+  assert(greetingLog.now == Nil)
+
+  input.fire("world")
+
+  assert(inputLog.now == List("world"))
+  assert(greetingLog.now == List("Hello world"))
+``
+
+
+:{efrp} programs are written in a more functional style
+composing behavior based on small individual functions,
+such as the :code{map} in :ref{Line; line:testing:; line=map}.
+
+To test applications the language provides tools similar to
+mock based solutions in object-oriented languages.
+It is possible to simulate the value of individual events or signals
+to test derived operators on specific inputs.
+Assume that the value of some :code{input} signal is
+not under control of the tests,
+but a derived signal :code{testMe} is tested:
+
+``{label=line:testing-mocking:}
+  val input: Signal[String] = ...
+  val testMe = Signal { input().toLowerCase  }
+
+  reevaluate(testMe).assuming(input -> "TEST String")  :§mock§
+  assert(testMe.now == "test string")
+``
+
+The code in :ref{Line; line:testing-mocking:; line=mock} forces a reevaluation of the signal,
+and simulates the values of the inputs of the signal.
+Using this technique allows very fine granular tests
+without modifying the code to be tested,
+and we believe the strategy supports testing arbitrarily complex applications,
+much bigger that the examples in our case studies.
+
+
+# Considerations on Language Design
+
+As with any language :{efrp} evolves with its usage.
+In this section we discuss considerations when designing an :{efrp} language,
+and show how our case studies guide the design of the language.
+
+
+
+## API Size
+label = rq:api-size
+
+We discuss multiple :{efrp} languages and the size of their APIs,
+and how API design relates to the intended use cases and concepts.
+
+:cite{FElm; Czaplicki2013} is designed for asynchronous composition of GUIs,
+and requires three operators for this purpose,
+combining signals, folding over past values, and making a computation asynchronous.
+:cite{Fran; Elliott:1997:FRA:258948.258973} is designed for animations, a similar use case to FElm.
+Fran does not include asynchronous computations,
+but has operators for transforming time,
+and dynamically recombining signals,
+required to change the speed and behavior of animations.
+In total, the Fran API lists around 10 to 20 operators in the API,
+including some minor variations of common operators.
+
+In contrast, reactive :cite{extensions; Liberty2011},
+includes operators specific to collections, asynchronous execution,
+and mathematical aggregation.
+The result is a library with over 450 operators:cite{; reactivexOperators},
+80 of which are considered :emph{core operators}.
+Core operators are those that exist not only because of multiple overloads, such as :code{averageInteger} and :code{averageDouble}.
+
+REScala does not target a specific application domain,
+and includes operators for combining events, signals,
+and converting between the two,
+as well as operators which integrate with imperative code.
+On the other hand, REScala refrains from including operators
+for a specific domain, such as mathematical aggregations.
+In total REScala has an API size of around 40 operators.
+About half are convenience operators for events,
+which form a small event processing sub language.
+The inclusion of operators into the REScala API is driven by our case studies.
+Most of the REScala operators are generic
+and used in multiple case studies –
+their usage is not limited to specific domains.
+Other operators such as :code{list} (c.f., Section :ref{rq:testing})
+are mainly used during testing,
+but are so useful there to warrant their inclusion.
+The case studies often derive more complex or specific operators
+from the basic ones,
+however none of them are common enough to warrant inclusion into REScala.
+
+
+
+
+
+
+
+## API Design
+label = rq:api-consistency
+
+:{efrp} languages minimize the number of concepts necessary to use their API,
+exposing only events and signals abstractions to programmers.
+As we discuss in Section :ref{rq:api-size},
+:{efrp} languages offer a rich set of operators in their API,
+building on top of events and signals.
+The derived operators have a semantics that is expressible
+as (a combination of) basic concepts and such semantics
+in REScala directly corresponds to the operator implementation.
+
+For example, consider the :code{||} operator in REScala,
+which is derived from the following event expression:
+
+
+``
+  def || [A](a: Event[A], b: Event[A]): Event[A] =
+  	Event { if (a.value.nonEmpty) a.value else b.value }
+``
+
+
+Accessing the value of an event inside an event expression,
+yields a Scala :code{Option} representing the value of the event.
+The event expression above defines,
+that the result of :code{a || b} is a new event :code{e} with the following behavior:
+If the reactive :code{a} activates with some value (:code{a} is :code{nonEmpty}),
+then :code{e} activates with the value of :code{a}, otherwise :code{e} activates with the value of :code{b}
+(if :code{b} is also empty, then :code{e} does not activate).
+Specifying operators using a small core set of concepts,
+makes the language much more accessible for novices and allows one
+to easily explain the semantics of complex programs.
+Note that in :{fr} (c.f., :ref{Chapter; chapter-programming_model}) we opted to provide one method for deriving a reactive for each unique feature in the calculus (map, fold, flatten, filter), but their only difference is how they initialize the reactive they create.
+The reactives are the single core concept used for semantics in both :{rescala} and :{cvtr}.
+
+
+## Purity in (Functional) Reactive Programming
+label = rq:external-purity
+
+:{efrp} has been initially developed in the context of pure functional languages,
+and operators in :{efrp} are still free of side effects.
+However, imperative languages allow to imperatively change the graph during execution.
+Consider creating a button for a UI,
+deriving a label signal that states how often the button was clicked,
+and displaying the label text on the button itself:
+
+``
+  val button = new Button
+  val label: Signal[String] = button.click.count
+    .map(c => s"This button was clicked $c times")
+  label.observe(txt => button.text = txt)
+``
+
+The last line sets the text of the button when the label changes – an imperative interaction not directly allowed in a pure language.
+In pure languages, the label text of the button has to be provided when the button is created,
+which leads to a cyclic definition (button depends on label, and label on button).
+A solution is shown in the following code example
+where the handler is registered as part of the button creation and no imperative change is required:
+
+``
+  def pipeline(click: Event[Unit]): Signal[String] =
+    click.count
+    .map(c => s"This button was clicked $c times")
+  val button = new Button(pipeline)
+``
+
+We provide a function to the button,
+and the function describes the pipeline to process the button clicks.
+With this approach the created pipeline is private to the button.
+To share events and signals between multiple UI components (buttons, labels, etc.),
+they all have to be initialized together with a combined and predefined pipeline of operators.
+As a result, purely functional :{efrp} languages may exhibit non-modular design constraints and only support limited use cases, such as a single animation or a single UI window.
+:cite{Elm; Czaplicki2013} applied functional reactive programming to web applications.
+However, to keep purity, the :{efrp} abstractions were removed from Elm,
+as they suffered from the problems we explained.
+In REScala we make the opposite choice and sacrificed purity to keep
+the abstractions of :{efrp} and integrate them with imperative applications.
+The integration allows programmers to add and reconnect events and signals as required.
+
+
+
+
+
+
+
+
+## Cycles
+label = rq:cyclic-graphs
+
+::figure{label=fig:rq:cycles}
+  :image{/Figures/Graphs/cycles.pdf}
+  Creating a cycle
+::
+
+:{efrp} languages require that the :{flowgraph} is acyclic
+to ensure that propagation terminates,
+but most :{efrp} languages do not statically enforce the graph to be acyclic.
+However, problems with cycles only rarely occur in practice.
+Consider the following code to create a cycle between signals a and b:
+
+``
+  val a = Signal { b.value + 1 }
+  val b = Signal { a.value - 1 }
+``
+
+Figure :ref{fig:rq:cycles}(A) shows the cycle the code
+is supposed to create.
+However, the code does not compile for :{rescala},
+because the embedding language prevents cyclic definitions of variables.
+To create a cyclic graph, imperative code is used:
+
+``
+  val h = Var(Signal(0))
+  val a = Signal { h.value.value + 1 }
+  val b = Signal { a.value - 1 }
+  h.set(b)
+``
+
+Figure :ref{fig:rq:cycles}(B) illustrates this approach.
+The first line creates the source signal named :code{h}
+containing the constant signal with value 0.
+The signal :code{a} depends on :code{h} and the inner value of :code{h} –
+:code{h.value} accesses the value of :code{h} and :code{h.value.value} additionally accesses the inner value.
+The last line changes :code{h} to point to :code{b}.
+
+Code that explicitly sets vars to other reactives is rare in practice.
+In our case studies, we find that only
+the universe simulation and the pong game
+have the potential for cycles.
+In both cases, the cycle is related to the update steps of the simulation,
+i.e., the position of the pong ball depends on the speed,
+and the speed depends on the position
+(the speed changes when the ball bounces of a wall).
+In both cases, the creation of cycles is explicitly avoided.
+
+# Conclusion
+
+Syntactically, :{cvtr} adds only replicated reactives and snapshots to :{efrp}.
+Thus, we believe that the remarks of this chapter still apply to :{cvtr}.
+Our general experience is that idiomatic :{efrp} code also is an improvement for :{apps} and results in the guarantees of :{cvtr} to fully apply.
+Integrations with other libraries and the applicability of :{efrp} is only expanded by :{cvtr} to include collaboration in distributed systems.
+The overall design decisions of :{cvtr} align well with :{efrp} – we still strive to maintain an API with a minimal amount of different concepts to make code more readable for developers.
+

@@ -1,0 +1,261 @@
+# The Reactive Programming Approaches
+label = section-related-reactive_programmings
+
+The term :emph{reactive programming} has been used for many things in the literature, and many things that are similar use different terms.
+This section presents approaches that either are syntactically inspired by reactive programming or have semantics that are equivalent to a denotational description of application state over time.
+
+## Functional Reactive Programming
+
+:cite{Elliott2010CTP; style=name} states that the two principles of Functional Reactive Programming (FRP) are denotational design and continuous time.
+:{rescala} does not support continuous time, and :{fr} is not a denotational semantic.
+This section explains why that is fine and why FRP is still relevant for this thesis.
+
+
+:cite{Fran; Elliott:1997:FRA:258948.258973} (by Elliott) is one of the earliest libraries for FRP and is implemented in Haskell.
+In certain ways Fran is quite similar to :{rescala}.
+Fran supports both events and signals (or behaviors, as signals are called in Fran), is implemented as a library using combinators and is free of glitches.
+However, the target domain of Fran are animations and not general interactive applications.
+Instead of reacting to a variety of external changes the state of an animation is mostly defined by the current time.
+The representation of a signal in Fran reflects this domain and each signal conceptually corresponds to a function from the current time to the signal value.
+The actual implementation is more complicated than a simple function from time to value for technical reasons:cite{; Elliott:1998:FIC:646453.693110}, resulting in an abstraction that superficially is similar to signals in :{rescala}.
+Due to the discrete nature of computer displays the current state of signals is sampled at a regular interval to produce a series of discrete images.
+Note that the importance of continuous time is that the domain of animations is represented exactly until the last moment where it is discretized for display.
+As a rough analogy, functional reactive animations are to videos what vector graphics are to raster images.
+
+Computer animations are much more interesting when they are interactive, thus even Fran has events to model discrete interactions with the system.
+However, representing an animation as a function from time to image data poses implementation challenges when dealing with interactive applications.
+A problem known as time and space leaks:cite{; Krishnaswami:2012:HFR:2103656.2103665} refers to the fact that a naive implementation has to store all inputs (a space leak) and recompute aggregations over those inputs (a time leak) to be able to produce images at an arbitrary point in time.
+While being able to jump to any point of time is useful (see debugging and tuning in :ref{Chapter; chapter-live_tuning} for examples), for many interactive applications it is only necessary to produce the next state given the current state and the current inputs – and do so quickly.
+
+Thus – to improve efficiency of the implementations – techniques such as push-based propagation:cite{; Elliott2009} (same principle as propagation in :{rescala}) were introduced to FRP.
+A discrete implementation of a continuous model is not perfect there are either still time and space leaks for edge cases or the model has to be restricted to disallow certain forms of dynamic graphs:cite{; Krishnaswami:2012:HFR:2103656.2103665,Krishnaswami:2013:HFR:2500365.2500588} – especially those concerning nested reactives.
+
+An alternative to improve efficiency is to change the programming model to enable more efficient implementations.
+One such approach is arrowized :cite{FRP; Nilsson2002}
+where functions to transform reactives are manipulated instead of the reactives themselves.
+The actual creation of the reactives is then delegated to the runtime to ensure that the application is not able to observe the internal mutability.
+
+The use of FRP in one of these or similar forms has been investigated in many specific application domains beyond animations.
+The peculiarities of the specific application domains often lead to specific implementations and may also include influences outside pure FRP (see below).
+Examples include the :cite{simulation of autonomous vehicles; Finkbeiner:2017:VPS:3055378.3055385},
+:cite{IoT; Calus:2017:FIM:3141858.3141861}
+especially low powered :cite{embedded systems; Sawada:2016:EFR:2892664.2892670},
+:cite{robotics; Hudak2003},
+:cite{network switches; Foster:2011:FNP:2034773.2034812,Voellmy:2012:PLH:2342441.2342451},
+:cite{wireless sensor networks; Newton2007},
+:cite{scalable web servers; Peterson2000},
+and :cite{reliable software for spacecraft; Perez2018}.
+
+On the theoretical side, :cite{Jeffrey; Jeffrey:2012:LTF:2103776.2103783,Jeffrey2013CFP,Jeffrey:2014:FRT} stated that a type system for FRP
+corresponds to linear time logic via :cite{Curry-Howard; howard1980formulae},
+i.e., an FRP implementation prooves certain LTL formulae.
+The implementation itself is based on lower level abstractions
+such as futures and :cite{observers; Jeffrey2013FRP}.
+
+
+
+
+## Discrete Reactive Programming
+
+The difficulty of efficient implementation in functional reactive programming stems from the desire to have a denotational semantics for a continuous domain, but then extend the use of that paradigm beyond just continuous animations.
+The authors of :cite{FrTime; Cooper2006} observe that interactive applications deal with explicit mutability and discrete events, and that the efficient implementations of functional reactive programming are discrete and hide internal mutability.
+Their conclusion is to remove the gap between the implementation and the reality of the environments and instead directly enable the programming of the mutable reactive data structures – essentially the same concept as the :{flowgraph} of :{rescala} albeit without explicit transactions.
+There are still events and signals and those still describe time-changing values, but any notion of abstract time is gone.
+We will call this approach Discrete Reactive Programming (DRP) for disambiguation even though the approach is still called functional reactive programming in most of the literature.
+
+DRP has been widely successful in communities of programming languages that support mutability, because its operational nature allows application developers (as opposed to runtime developers) to integrate DRP with existing tools, frameworks, and APIs.
+However, there are also several implementations of DRP that integrate into various programming languages and have their own set of external integrations and features.
+
+:cite{FrTime; Cooper2006} uses Schemes macro system to provide automatic lifting of functions.
+Automatic lifting makes the use of reactives transparent to the programmer.
+:cite{Flapjax; Meyerovich2009} implements DRP for JavaScript motivated by the frequency of callback-based applications in the domain of Web UIs.
+Flapjax provides a templating mechanism to embed signals as part of the displayed HTML.
+:cite{FELM; Czaplicki2013} prohibits the use of dynamic reactives to allow pipelined execution of a push-based update propagation.
+The execution strategy of FELM allows the integration of non-blocking execution of long-running tasks into reactives.
+:cite{Scala.React; Maier2012} integrates with thread pools of external libraries,
+and also introduces a domain specific language to combine temporal sequences of event occurrences.
+
+For further reading, :cite{Bainomugisha:2013:SRP:2501654.2501666; style=name}
+provide a comprehensive survey on reactive programming languages,
+with a focus on the implementation model and features supported by the individual implementations.
+
+
+## Synchronous Languages
+
+As far as we can tell, synchronous languages such as :cite{Esterel; Florence:2019:CEN,Berry:1992:ESP:147276.147279} predate functional reactive programming.
+Synchronous languages are in the literature treated as a completely separate topic to reactive programming, but there are several close relations beyond the fact that Esterel also operates on signals – in this case inspired by the concept of physical wires in the design of an electrical circuit.
+Esterel was designed for embedded reactive systems such as microcontrollers or drivers for hardware interacting with external systems.
+The goals of Esterel are to provide deterministic concurrency, that is, even though the program is written in a style that looks like concurrent imperative code the resulting execution only has a single valid set of outputs for each input at a specific time.
+This is achieved by compiling Esterel programs into a dependency graph very similar in nature to the implementations of reactive programming languages.
+Due to the imperative syntax, it is possible to write syntacticlly correct Esterel programs that are not deterministic in nature or require circular logic which cannot be expressed as an acyclic graph, those programs are simply rejected by the compiler.
+Quite recently, :cite{style=name; Florence:2019:CEN} provided a calculus for Esterel that expresses the language in a style more similar to what functional reactive programmers would expect – although still consisting of explicit writes to signals instead of a declarative description.
+
+What Esterel makes explicit, however, is the idea of synchronous execution.
+The idea of synchronous execution is that when a change in inputs occurs, then all derived values are conceptually computed at the same time.
+This is exactly the semantics of a :{rescala} transaction and also how a functional reactive system behaves when a frame at a certain point in time is computed.
+However, the formulation using synchronous execution makes the relation to physical hardware and parallel execution much more apparent.
+That is, a static :{flowgraph} is related to a hardware design where all computations happen at the same time, but only the final stable value is visible.
+
+There are other synchronous programming languages such as :cite{CoReA; DBLP:conf/wdag/BoniolA93} and :cite{Céu; DBLP:conf/sensys/SantAnnaRILT13} that focus on deterministic concurrency for embedded systems.
+:cite{style=name; amadio2006reactive} discuss using synchronous programming for coordination of general multi-threaded systems.
+Differently from the imperative synchronous style pioneered by Esterel, there are two prominent synchronous dataflow languages,
+:cite{SIGNAL; DBLP:conf/fpca/GautierG87} and :cite{Lustre; DBLP:conf/popl/CaspiPHP87} that use a more declarative style do define their semantics.
+
+There is clearly a lot of unexplored overlap between the synchronous and reactive programming communities.
+In :ref{Chapter; chapter-compilation} we have already discussed how the :{flowgraph} can be compiled for embedded devices something we started to investigate because of the relation between synchronous languages and the :{flowgraph}.
+
+
+
+
+## Functional and Reactive Programming
+label = section-related-functional_and_reactive
+
+As we have discussed at length, interactive applications update their internal state and produce results in reaction to external events.
+This includes not only user interfaces, but a wide range of domains such as Web servers, and sensor :cite{applications; Salvaneschi:2014ab}.
+How are languages called that use a (remotely) functional approach to react to any form of external inputs in any of those domains? Well, the term people commonly seem to choose is functional reactive programming.
+For the sake of disambiguation, we will use the term Functional and Reactive Programming (FaRP) to describe such systems that do not belong to FRP.
+
+Traditionally, the main design issue when implementing reactive
+applications has been to decouple the code that detects or triggers
+the events from the code that handles the events (i.e., to implement
+the semantic model of an application independently of the user
+interface).
+The :cite{observer pattern; Gamma2000} already achieves decoupling,
+but simple observers lack desirable features like :cite{composability; Elliott:1997:FRA:258948.258973} so that complex
+reactions can be build from simpler ones.
+The syntax used for
+composition should also make the semantics and the control flow of the
+composition obvious and not hide them behind boilerplate code or
+scatter them around different places of the code – a problem caused by
+inversion of :cite{control; Haller2006}.
+
+A popular approach belonging to this category are reactive :cite{extensions; Liberty2011} or ReactiveX.
+ReactiveX is an API for asynchronous streams. Being asynchronous in nature is what sets ReactiveX apart most from FRP.
+Syntactically, ReactiveX is inspired by the combinator libraries used by early FRP languages, but, as an amusing side note, the ReactiveX documentation now provides a disambiguation:cite{; reactivexIntroduction} from the term FRP and clearly distances itself from that term, due to all the confusion that is caused by people refering to ReactiveX as FRP.
+Semantically, ReactiveX is a set of operators that allow composition of observers (as in the observer pattern).
+ReactiveX provides a useful API compared to programming with observers manually, but it offers no semantic benefits or correctness guarantees on top of observers.
+There are implementations of the ReactiveX API in many programming languages (similar to how there is an API for arrays in many programming languages).
+
+The :cite{Elm; ElmWeb} programming language is the modern evolution of what once was the :cite{FELM; Czaplicki2013} research language.
+FELM implemented pure FRP as discussed before.
+Elm abandoned the possibility to compose signals and events into complex applications, and instead focuses on a single event handler that produces incremental changes to a single global state.
+This focus enables Elm to provide good developer ergonomics and automatic guarantees for “Single Page Applications” while keeping the programming paradigm quite simple.
+
+Facebook’s :cite{React; ReactWeb} is another well known library with a naming similar to FRP.
+React is a JavaScript library for creating web pages from “functional components”.
+Components are functions that transform part of a (global) state into a piece of HTML (e.g. a widget that shows the currently active contacts on Facebook).
+React has similar use to Elm, but is suitable for more types of web pages, since it integrates into existing web pages instead of completely replacing them.
+However, React focuses on the UI part, not on application design or any advanced features.
+
+There are many more libraries and frameworks that roughly fall in this category, see the project page of the :cite{TodoMVC; TodoMVC} project to get an overview of some of those systems.
+In general, most libraries seem to focus on the API side of providing useful combinators, but do not implement synchronous semantics, not to mention any form of continuous time.
+
+
+## Distributed Reactive Programming
+label = section-related-parallel_distributed_rp
+
+A recent focus of FRP and DRP (and even FaRP) is
+distribution:cite{; Carreton:2010:LDR:1894386.1894389,dreamTSE,Drechsler2014,Margara2014,Reynders:2014:MFR:2661136.2661140,VanCutsem2014}.
+Research on Distributed Reactive Programming (distributed RP) includes new consistency models,
+such as eventual consistency via CRDTs for replicated
+signals:cite{; Myter2016}
+and notions of relaxed glitch freedom that
+account for an error margin:cite{; DBLP:conf/fsen/ProencaB17}.
+Also, in the area of distributed RP, researchers proposed
+mechanisms to achieve fault tolerance.
+Leased :cite{signals; Myter:2017:HPF:3141858.3141859} enable reacting
+to a partial failure when a remote host does not produce a value after a timeout.
+
+In general, all forms of reactive programming seem to be a natural fit for distributed applications, with events representing messages from the network or user input.
+However, many functional reactive languages and frameworks
+do not provide support for unreliable networks.
+Typically, reactive :cite{languages; Maier2012,Meyerovich2009,Czaplicki2013} simply
+delegate the responsibility for error handling to the host language, and ultimately to the programmer.
+In distributed reactive :cite{programming; Drechsler2014,Margara2014,VanCutsem2007},
+reactives on different devices are connected to each other
+and update messages are sent over the network
+whenever a remote dependency changes.
+In the presence of faulty devices and unreliable connections, such update messages may get lost
+causing several problems, such as glitches, changes that are visible on one host but not on another host,
+or application unresponsiveness when new changes cannot be processed
+while messages are being resent to a
+device that failed and is restored.
+
+Unreliability has been partially investigated in the context of some FRP derivatives.
+Timeouts have been introduced to a distributed runtime and dataflow :cite{Myter:2017:HPF:3141858.3141859}.
+:cite{ReactiveX; Liberty2011} integrates and propagates errors into as part of the dataflow similar to :{rescala}.
+However, to the best of our knowledge, no solution exists to automatically restore and reconnect a :{flowgraph} after a crash.
+:cite{DREAM; Margara2014,dreamTSE} is
+a middleware for distributed reactive programming, which lets the programmer choose among
+different levels of consistency
+guarantees in distributed reactive systems, including FIFO consistency, causal consistency, glitch freedom and
+atomic consistency.
+Ur/:cite{Web; Chlipala2015}
+is a multitier programming language
+that uses reactive programming to update the client UI.
+However, to the best of our knowledge, there is no integration of network errors and the reactive part,
+hindering application-wide reasoning
+and lacking common abstractions for distribution and reactivity.
+:cite{AmbientTalk/R; ambienttalkR} implements distributed RP for mobile peer-to-peer networks.
+It is focused on providing some communication in loosely coupled networks instead of any consistency guarantees.
+The :cite{SID-UP algorithm; Drechsler2014} implements
+distributed RP with glitch-freedom, but uses global locking.
+However, none of the approaches provides the full feature set of :{rescala} with the same level of automation of fault tolerance.
+
+## Parallel Synchronous Reactive Programming
+
+As far as we are aware, :{rescala} is still the only reactive programming language with transactions that have synchronous semantics and can execute in parallel while preserving serializability.
+The formal model of :cite{Elm; Czaplicki2013} supports pipelined execution, but the model was never implemented.
+:cite{Esterel; Florence:2019:CEN} supports parallel execution in hardware, but not for arbitrary transactions in an application.
+
+Related approaches such as :cite{ReactiveX; reactivexIntroduction} do provide parallel execution for their observables (an observable corresponds to a reactive), but the behavior is only defined for each individual observable – there are no guarantees for the overall behavior of the application regarding concurrency – thus developers have to manually consider race conditions.
+Only a transactional programming paradigm – such as :{cvtr} – provides the necessary framework to define what conflicts are and thus provide correctness automatically.
+
+
+
+## Formal Models of (Functional) Reactive Programming
+
+:{fr} is not the only calculus that exists in the space of reactive programming, but the only one that also includes automatic fault tolerance.
+
+:cite{FELM; Czaplicki2013} provides a calculus for the functional surface
+language that defines the reactive application.
+Yet, the actual behavior
+of the application at runtime – i.e., how values flow through the graph –
+is captured by a translation to ConcurrentML, hindering formal reasoning about the
+behavior of the complete system.
+An additional limitation of FELM is that the :{flowgraph} cannot be modified at runtime.
+
+:cite{Kamina2018; style=name} provide a formalization which
+aims to simplify the abstractions used in RP. Thus, their formalization is intentionally minimalistic.
+In particular, their formalization uses standard operational
+semantics for the evaluation of the surface language but uses denotational semantics (functions on sets) for propagation of changes through the :{flowgraph}.
+While the separation simplifies the presentation of the calculus, we believe it complicates the reasoning about the details of transactions – a necessity when reasoning about faults.
+
+
+:cite{DREAM; Margara2014, dreamTSE} also formalizes the propagation of events in a distributed system,
+however with a different focus. The goal is to provide a formal foundation for analyzing
+the consistency level provided by different propagations algorithms (e.g., fifo versus glitch freedom).
+However, DREAM does not deal with unreliable message delivery or restoration,
+and does not integrate distributed state with local operations.
+
+
+## Building Blocks for Reactive Programming Implementations
+
+In the area of the implementation of RP languages, :cite{style=name; DBLP:journals/programming/RamsonH17} proposed Active
+Expressions as a fundamental primitive
+for different RP implementations.
+
+Publish-subscribe systems are the distributed counterpart of observers.
+Publish-subscribe systems aim to support
+loose coupling among event publishers and observers.
+By contrast, complex event processing
+:cite{(CEP); Margara:2011:PFI:2002259.2002307} is about correlating
+events.
+Both types of systems usually rely on callbacks with all their :cite{problems; Eugster:2003:MFP:857076.857078,Pietzuch:1030837,Meier:2002:1030833}.
+
+Self-adjusting computations :cite{DBLP:conf/icalp/Harper04,Hammer:2007:PPS:1248648.1248651} are a class of techniques to make existing batch programs incremental, i.e., when only a small part of the input changes then only the dependent part of the output must be recomputed.
+The strategy essentially works by automatically decomposing the program into something conceptually similar to the :{flowgraph}.
+However, the point of :{rescala} and similar languages is to improve application design by directly programming the :{flowgraph} instead of first using an inferior representation of the program logic.
+
+
+

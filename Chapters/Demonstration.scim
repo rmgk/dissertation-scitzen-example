@@ -1,0 +1,384 @@
+== An Overview of :{rescala} by Example
+label = chapter-demonstration
+
+In this chapter we introduce :{rescala} by example.
+We focus on the surface syntax used by developers and thus only marginally cover fault tolerance which is mostly automatic and not visible in the syntax.
+At its core, the :{cvtr} programming paradigm is about composing many small declarative reactions to external or internal changes into complex applications.
+The result of the composition is the :{flowgraph} – a declarative model of how an application reacts to external changes.
+:{rescala} implements the :{cvtr} programming paradigm as a Scala library.
+This embedding provides an object-oriented API to interact with the :{flowgraph} of :{rescala}.
+
+From a developer’s perspective :{rescala} most prominently provides the :emph{event} and :emph{signal} APIs that provide the small building blocks out of which the :{flowgraph} is composed.
+In addition, there are APIs for bundling changes into transactions, storing state into persistent snapshots, and connecting parts of the :{flowgraph} to other devices.
+Readers familiar with the general syntax of :{rescala} may want to skip to :ref{Section; sec-shared_calendar-example} for a more involved example that serves as a quick overview of the syntax while highlighting the most recent additions for fault tolerance.
+
+
+::figure{label=fig-demonstration-rescala_system_model}
+  :image{/Figures/System/REScala Integration.pdf}
+  Integration of :{rescala} and the host language.
+::
+
+We do not consider :{cvtr} as a replacement for existing programming paradigms that are better suited for implementing algorithms, modeling the domain data, and organizing the application into modules.
+Instead, :{rescala} embeds itself into its host language as shown in :ref{Figure; fig-demonstration-rescala_system_model}.
+The green block (on the right) of the figure shows the different parts of :{rescala} and the white blocks of the figure shows how the embedding environment and host language.
+The overall application is defined in Scala, using packages, objects, and functions to organize the code.
+The :{flowgraph} seamlessly integrates with other abstractions in the language, but lives at an intermediate layer, as the graph itself relies on functions written in the host language.
+Allowing the use of Scala where possible, provides developers the flexibility to integrate existing libraries and programs with :{rescala}.
+For convenience, :{rescala} also provides integration with the external environment (e.g., UI libraries) and built-in operators that do not require developers to write custom functions.
+If the scope of the target domain is limited enough to not need custom integrations with the environment, then it is possible to fully remove the host language and write :{cvtr} programs by only declaring the dataflow with integrations and built-ins (c.f., :ref{Chapter; chapter-compilation}).
+However, in the case of :{rescala}, the declaration of the structure of the :{flowgraph} always uses Scala syntax.
+In the rest of this section, we first introduce the concepts of transactions and reactives, and then we discuss a concrete example of how a developer would use :{rescala}, i.e., how the Scala API looks and behaves.
+
+# Transactions and Reactives – the Basic Concepts
+
+First, we need two discuss two general concepts are essential to understand both :{rescala} and :{cvtr}: transactions and reactives.
+
+:% ## Transactions
+
+:{cvtr} uses transactions to define its semantics especially regarding time.
+With :{apps} there is often the question if two things occurred at the same time and transactions provide the framework to answer such questions.
+In :{cvtr}, everything that is part of a single transaction is considered to happen “at the same time”.
+This leads to a semantics that simplifies the mental model for developers: within a transaction state does not change.
+In particular, any declared dependency between values is always correct within a transaction.
+In addition, transactions provide intuitive behavior for users, because users associate reactions with any action that happened at the same time.
+In :{rescala}, each method of the Scala API causes a single transaction and there is rarely a need to explicitly declare transactions.
+If required, the :code{transaction} method bundles multiple interactions into a single transaction.
+
+
+
+:% ## Reactives
+
+Reactives represent interdependent discrete time-changing values. Reactives are the nodes of the :{flowgraph}.
+:emph{Sources} are reactives that represent external input from outside the :{flowgraph}, such as user interactions or sensor data.
+:emph{Derived reactives} allow forming complex behavior by deriving behavior from other reactives (including sources).
+When a source changes, then all derived reactives change (as part of the same transaction) according to their :emph{operator}.
+The operator is to a reactive is what a class is to an object – an abstract definition of the behavior of many concrete reactives.
+For example, a reactive with the map operator changes at the same time as its input, but the value is transformed by applying a user-defined function.
+:{rescala} provides a range of operators including those that combine multiple reactives, aggregate state, and change the :{flowgraph} dynamically.
+
+We distinguish between two categories of reactives: events and signals.
+The distinction is based on the value that a reactive represents at a given point in time.
+A signal always holds a value, and represents state in the program,
+e.g., the current text of an input field.
+An event only has a value while the reactive is active,
+and it represents actions that occur in the program,
+e.g., when a button is clicked.
+The separation into events and signals is so significant that it is represented in the type system – an event reactive will be of type :math{"\type{Event}"} and a signal reactive of type :math{"\type{Signal}"}.
+Signals and events thus each provide their own API that allows to derive new reactives with fitting operators.
+For example, the signal API generally produces reactives that combine the value of many input signals, while the event API produce reactives that select the value of one of multiple events.
+
+
+
+::figure{label=fig:overview:full-code-formalism-chat-example}
+  ``{label=line:overview:full-code:}
+    val name: Var[String] = Var("")
+    val text: Evt[String] = Evt()
+    val message: Event[String] = text.map{ l => name.value + ": " + l)}
+    type Room = List[String]
+    val room1: Signal[Room] =
+          message.fold(List.empty){ (history, msg) => msg :: history}
+    val room2: Signal[Room] = Var(List("Me: a constant message"))
+    val roomList: Signal[List[Room]] = Var(List(room1, room2))
+    val index: Var[Int] = Var(0)
+    val selectedRoom: Signal[Signal[Room]] =
+          Signal { roomList.value(index.value) }
+    val roomContent: Signal[Room] = selectedRoom.flatten
+    val contentWidget: Signal[Widget] = roomContent.map(makeListWidget)  :§dataflow-evaluation-stop§
+    displayUI(name, text, contentWidget)
+  ``
+  Complete chat example code for a single device.
+::
+
+::figure{label=fig:background:dataflow-example-chat}
+  :image{/Figures/Graphs/chatroom-dataflow-example.pdf}
+  The :{flowgraph} of the chat example.
+::
+
+# The Chat Example – :{rescala} Step by Step
+
+:ref{Figure; fig:overview:full-code-formalism-chat-example} shows the complete code of a simple chat example we use to introduce the core concepts of the API step by step.
+The figure includes type annotations showing which reactive is a signal or an event, and what type of value the reactive has.
+:ref{Figure; fig:background:dataflow-example-chat} shows the :{flowgraph} of the running example,
+with each box representing a reactive with their name taken from the variable they are stored in.
+Arrows point in the direction of dataflow, i.e., the inputs are at the tail of an arrow and the derived reactives are at the tip.
+Reactives with no incoming arrows are sources.
+The dashed lines represent dynamic edges, and dashed lines with diamonds represent nesting of reactives in other reactives.
+In the following, we will incrementally introduce and discuss the application code that builds that graph – starting with the following snippet.
+
+``{label=example-chat-inline-sources}
+  val name = Var("Alice")
+  val text = Evt[String]()
+  val message = text.map{ txt => name.value + ": " + txt) } :§derive§
+``
+
+The code snippet creates a source signal (:code{Var}) that represents the name of the current user, and a source event (:code{Evt}) whose occurrences represent chat messages.
+A :code{Var} is subtype of a signal and supports the full signal API, but in addition provides an API for imperative code to set the value of the signal, thus providing an integration with imperative Scala code.
+An :code{Evt} is analogous to :code{Var} but extends events.
+The values of the two source reactives are combined by using the :emph{map} method, which returns a new event reactive (:code{message}).
+The operator of the reactive returned by map is specialized with a user-defined function that appends the name and text strings.
+When we refer to a reactive with a specific type and operator such as :code{message}, we often use the name of the defining method and say that :code{message} is a :emph{map event}.
+Note that it is generally easy to combine signals and events in :{rescala}.
+The example includes all basic abstractions of :{rescala}: events, signals, sources, and derived reactives.
+These abstractions are discussed next.
+
+
+## Events
+label = section-demonstration-events
+
+An event is a “container” for occurrences at a discrete point in time.
+Each occurrence of an event has an associated value and there is no value when the event does not occur.
+For example, the user sending a new message would be an occurrence of an event, with the text of the message as its value.
+
+Most event operators focus on reacting to occurrences of events.
+For example, the :code{map} in :ref{Line; example-chat-inline-sources; line=derive} derives a new event, by applying the passed function every time the input event occurs.
+Other common operations are filtering of events, where the derived event only has those occurrences that pass a filter function, and the choice :code{||} operator that occurs whenever the right or the left input occurs, with a bias on the left one if both inputs occur at the same time.
+Due to the abstract notion of time used by :{cvtr} “at the same time” means that two occurrences happen in the same transaction, which typically means they are (indirectly) derived from the same input.
+Correlating event occurrences based on real time – as is common in event processing scenarios – is rare for :{apps}, and currently not provided by :{rescala}.
+
+## Signals
+
+Values that change over time are represented as signals.
+Signals always have a value and reactives derived from signals access that value using the :code{.value} syntax as seen in :ref{Line; example-chat-inline-sources; line=derive}.
+In the example, the derived message is an event reactive, because :code{.map} is called on an event.
+The most common form of deriving signals are signal expressions using the :code{Signal} keyword.
+Accessing dependencies is always explicit in :{rescala} – using the :code{value} method to syntactically mark accessed dependencies.
+The current value of a derived signal is updated automatically by executing its computation
+whenever its dependencies change, similar to how formulas in spreadsheets are reevaluated when one of the values they use is changed.
+Changes of a signal are automatically propagated to
+:emph{derived} signals that use the signal in their definitions.
+
+## Imperative Sources
+
+Imperative sources (:code{Var} and :code{Evt} in :{rescala}) allow imperative code to make changes to values in the :{flowgraph}.
+For example, a message is sent using :code{text.fire("Hello Bob!")}.
+The typical use for imperative sources is as part of integration libraries.
+For example, the Swing UI library executes a callback when a user presses a button and we would use the :code{.fire} method as the callback.
+
+Changing the value of an imperative source is the simplest form of starting a new transaction.
+When a transaction changes any reactive, then the derived reactive changes accordingly resulting in a chain of reactions – a process called :emph{propagation} (see :ref{Section; section-demonstration-propagation}).
+
+
+## Folds
+:emph{Fold} signals (or simply :emph{folds}) aggregate individual event occurrences – similar to folding over (infinite) lists.
+A fold, such as in :ref{Line; example-chat-inline-folds; line=fold-example}, creates a signal with an initial value and updates it according to the parameter function every time the event occurs.
+
+
+``{label=example-chat-inline-folds}
+  type Room = List[String]
+  val room1: Signal[Room] =
+        message.fold(List.empty){ (history, msg) => msg :: history} :§fold-example§
+``
+
+We represent chat rooms as their history of messages – implemented as a list with the newest message at its head.
+The :code{room1} fold signal accumulates all messages into the history using :code{::} to add an element to the head of the chat history.
+Folds are central to the :{cvtr} paradigm, because their value depends on the values and order of all occurrences of the input event – this is how state is encoded in the :{flowgraph}.
+Or, changing the viewpoint, all operations that depend on value and order of occurrences can be encoded as a fold,
+thus supporting folds allows us to support all such operations.
+We will use this to our advantage later.
+
+
+## Signal Expressions
+
+In contrast to events that may or may not have an occurrence in any given transaction, signals always have a current value.
+Thus, the only way to combine multiple signals is to apply a function to the values of the input signals.
+The result of the function is the value of the derived signal.
+In our chat example we use an index to select one of multiple chat rooms to be then displayed to the user.
+
+``{label=example-chat-inline-signal_expressions}
+  val roomList = Var(List(room1, room2)) // list of two rooms :§list-of-rooms§
+  val index = Var(0)
+  val selectedRoom = Signal { roomList.value(index.value) } :§derive-from-room-list§
+``
+
+The :code{selectedRoom} uses a signal expression to select the one at the position denoted by :code{index} (:ref{Line; example-chat-inline-signal_expressions; line=derive-from-room-list}).
+Signal expressions are blocks of Scala code, but inside the block the :code{.value} method of input signals is available, similar to the :code{.map} method of events.
+In the example, :code{roomList.value} returns the list of two rooms (at least initially).
+The function application syntax (the parenthesis) is not part of the :code{.value} method, but instead is an index-based selection of elements of the list.
+The plain Scala equivalent of the signal expression would be :code{roomList(index)}.
+Signal expressions allow developers to program in a familiar direct coding style, only requiring the use of :code{.value} to unwrap signals.
+Using :code{"Signal{}"} to delimit the scope of signal expressions and explicitly using :code{.value} to unwrap signals is a design choice in :{rescala} to make the use of reactives explicit.
+Using explicit methods to convert between types (signals and their values) is generally considered best practice in Scala and similar typed languages to make it easier for readers of the code to understand what is happening.
+
+
+## Flatten and Dynamic Dependencies
+
+:{rescala} allows for creating new reactives at runtime and add them to the :{flowgraph}.
+New reactives may use any existing reactive as an input, thus adding arbitrary new outgoing edges to the :{flowgraph}.
+Incoming edges can only be changed by the reactive itself and we call reactives with changing inputs :emph{dynamic reactives}.
+Dynamic reactives are typically derived from reactives that contain other reactives as their values – such as the :code{selectedRoom} in :ref{Line; example-chat-inline-signal_expressions; line=derive-from-room-list}.
+We call reactives that are contained in the value of another a :emph{nested reactive} (or more specifically nested signal or nested event).
+Both rooms in :ref{Line; example-chat-inline-signal_expressions; line=list-of-rooms} are nested signals inside the :code{roomList}.
+Nested reactives on their own are not special, they are values flowing through the :{flowgraph}.
+The value of directly nested signals is accessed using the :code{.flatten} method.
+
+``{label=example-chat-inline-flatten}
+  val roomContent = selectedRoom.flatten :§flatten-room-list§
+``
+
+When a nested signal is flattened, then a dynamically changing dependency is created.
+In this example, :code{roomContent} depends on either :code{room1} or :code{room2}.
+In :ref{Figure; fig:background:dataflow-example-chat} the dynamic edge is shown with a dashed arrow and nested reactives are shown as dashed lines with diamonds.
+The :code{roomContent} signal has two inputs, the first is always the :code{selectedRoom} signal, the second is the dynamic one and defined by the first input.
+Signal expressions also support dynamic edges and the flatten operation could be rewritten using a double unwrapping of signals.
+
+``{label=example-chat-inline-flatten-expression}
+  val roomContent = Signal { selectedRoom.value.value }
+``
+
+Accessing nested signals using signal expressions produces a dynamic :{flowgraph} in the same way as flatten does, but using signal expressions enables directly selecting nested signals inside some other data structure or event multiple levels of nested signals.
+However, it is always possible to rewrite signal expressions with dynamic access instead use only static access and (multiple) flatten reactives.
+For example, assume we have a a function :code{f} that dynamically computes a reactive based on the value of reactive :code{r} and we want to pass the value of the dynamic reactive to a function :code{g}.
+Then the two lines below compute the same result.
+
+``
+  Signal { g(f(r.value).value) }
+  r.map(f).flatten.map(g)
+``
+
+Thus, we limit our later formal analysis to flatten reactives without loss of functionality.
+
+
+
+
+## Observers
+Observers provide a way to integrate with imperative Scala APIs.
+Observers execute a callback function every time the observed signal changes its value or the observed event has a new occurrence.
+The callback function is applied to the current value of the reactive.
+For example, to print the whole chat history to the console every time a new chat message is sent we use the :code{println} function as an observer.
+
+``{label=example-chat-inline-observer}
+  roomContent.observe(println)
+``
+
+Observers are an API meant to integrate with existing imperative APIs of UI libraries.
+The completed example in :ref{Figure; fig:overview:full-code-formalism-chat-example} uses such an integration with a UI library instead of directly using observers.
+In that case, the sources and the view on the chat are simply passed to a UI library that understands reactives.
+
+
+# Peek Behind the Scenes
+
+While developers do not need to understand all the internal details of :{rescala}, it is beneficial to understand the basics parts of the internal design that have an influence on how :{rescala} behaves.
+We greatly expand on these details in the rest of the thesis.
+
+## Propagation
+label = section-demonstration-propagation
+
+An application that uses :{rescala} combines reactives using map, fold, flatten, etc to build acyclic :{flowgraph}s in preparation to react to external stimuli as soon as they arrive.
+Until now, we have given an intuition that the sources of the :{flowgraph} can be directly changed by external code starting a transaction that also changes all derived reactives.
+In a transaction, the set of :emph{active} reactives – those directly or indirectly derived from the sources changed in the transaction –
+change their values to reflect the changes in their inputs.
+We say that active reactives :emph{reevaluate} to compute new values in response to the changes.
+The process of :emph{reevaluating}
+all active reactives is called :emph{propagation}.
+Conceptually all reevaluations in a single propagation occur at the same time, which defines the semantics of propagation to be synchronous.
+Synchronous semantics simplifies reasoning about program behavior :cite{Berry:1992:ESP:147276.147279,Salvaneschi2017empirical}.
+However, in a real implementation, the process of propagating new values to all derived reactives is not instantaneous.
+External factors such as other threads starting a concurrent transaction may occur during another transaction.
+There is also the potential of a device crash or a disconnect to occur during the processing of a transaction.
+:{rescala}, our formal model, and the :{cvtr} paradigm itself are all designed to face these challenges.
+We formally show that the step wise propagation behaves equivalently to a synchronous system (:ref{Chapter; chapter-formalization}).
+
+
+## Space and Time Leaks
+Some implementations of folds suffer from a problem of infinitely growing memory requirements and computation time:cite{; Krishnaswami:2013:HFR:2500365.2500588}.
+These leaks exist because those implementations require that when a new fold is created, all event occurrences that happened prior to that fold – since the program was started – are visible in the current state of the fold.
+This is necessary to ensure that each fold that uses the same user-defined function, starting state, and input event also has the same value – a property required by side-effect-free languages such as Haskell.
+:{rescala} follows the more pragmatic approaches of the Scala language where folds including occurrences starting from the transaction in which the fold is created.
+Thus, :code{.fold} is to be considered as having side effects.
+
+
+## Cycles
+Dynamic edges allow the creation of cycles in the :{flowgraph}.
+Cycles in the graph can cause unsatisfiable constraints to the :{flowgraph} such as :math{"A=B + 1"} and :math{"B=A + 1"}.
+A greedy propagation algorithm would keep increasing :math{A} and :math{B} never terminating, and any form of early termination of a transaction would leave a constraint from a derived reactive to be violated.
+Thus, cycles are not allowed in :{cvtr} nor in :{rescala}.
+Dynamic changes that add cycles can be detected by a straightforward graph traversal at the time a dependency changes.
+However in practice this issue is rare, because the Scala language does not allow cyclic definitions and cyclic graphs require contrived setups involving dynamic reconfigurations that does not occur in normal programs, thus our current stance is that those checks are unnecessary.
+
+
+# The Shared Calendar Example
+label = sec-shared_calendar-example
+
+::figure{label=fig-shared_calendar-code}
+  ``{label=line-background-shared_calendar-code}
+    case class Entry(title: Signal[String], date: Signal[Date])  :§entry-case-class§
+
+    val newEntry: Event[Entry] = App.newEntryUI() :§input-evt§
+    val automaticEntries: Event[Entry] = App.nationalHolidays() :§from-network§
+    val allEntries = newEntry || automaticEntries  :§orOperator§
+
+    val selectedDay: Signal[Date] = :§selected-day-from-ui§
+      Storage.persist(id = "day", default = Date.today){
+        init => App.selectedDayUI(init) } :§selected-day-from-ui-end§
+    val selectedWeek = Signal { Week.of(selectedDay.value) }  :§derived-signal-example§
+
+    val entrySet: Signal[ReplicatedSet[Entry]] =  :§start:fold-example§
+      Storage.persist("entryset", default = ReplicatedSet.empty){:§replicated-set§
+        init => allEntries.fold(init) {
+          (state, entry) => state.add(entry) } } :§end:fold-example§
+
+    Network.replicate(id = "entryset", reactive = entrySet) :§distribute§
+
+    val selectedEntries = Signal {  :§selected-entries-signal-expression§
+      entrySet.value.toSet.filter { entry =>  :§selected-entries-filter-entrySet§
+        selectedWeek.value == Week.of(entry.date.value)   :§signal-expression-apply§
+      }
+    } :§selected-entries-signal-expression-end§
+
+    selectedEntries.observe(Ui.displayEntryList)  :§observer-signal§
+  ``
+
+  Excerpt of :{rescala} source code for the shared calendar application.
+::
+
+::figure{label=fig:background:reactive-graph}
+  :image{/Figures/Graphs/shared-calendar-example.pdf}
+  The :{flowgraph} for the calendar application.
+::
+
+We discuss a second case study to show a more involved domain model for an interactive application, but also to show the syntax for snapshots and replication used in :{rescala}.
+A user of the shared  calendar application can create new calendar entries and
+select the displayed week.
+The calendar will be synchronized with other users when a connection is available.
+Figure :ref{fig-shared_calendar-code} shows our implementation.
+We refer to it as we discuss how events and signals are relevant for representing fault-tolerant application state and communication.
+The :{flowgraph} of the application is depicted in Figure :ref{fig:background:reactive-graph}.
+
+The calendar applications manages a list of calendar entries.
+The entry class in :ref{Line; line-background-shared_calendar-code; line=entry-case-class} consists of two nested signals representing the title and date of the entry.
+New entries enter the calendar either by user input (:ref{Line; line-background-shared_calendar-code; line=input-evt}) or from the network (:ref{Line; line-background-shared_calendar-code; line=from-network}).
+Both cases are modeled as events.
+The two source events are combined into a single derived event using the choice :code{||} method in :ref{Line; line-background-shared_calendar-code; line=orOperator}.
+
+:ref{Lines; line-background-shared_calendar-code; line=selected-day-from-ui} :ref{to; line-background-shared_calendar-code; line=selected-day-from-ui-end} show a source signal that represents the day the user has selected in the UI which is persisted to permanent storage using a given ID.
+:ref{Section; sec:recovery} discusses how persisting values work.
+The currently selected week is derived from that source as normal (:ref{Line; line-background-shared_calendar-code; line=derived-signal-example}).
+Lines :ref{line-background-shared_calendar-code; line=start:fold-example} to :ref{line-background-shared_calendar-code; line=end:fold-example}
+define a list of all calendar entries as the signal :code{entrySet} by folding over the calendar entry events and collecting them into a set.
+Similar to the selected day the application also declares that the set of calendar entries must be persisted to storage.
+
+The value type of the set of entries in :ref{Line; line-background-shared_calendar-code; line=replicated-set} is a :code{ReplicatedSet} which is a special data type that enables :{rescala} to transparently replicate the signal to other devices over the network.
+Replication requires a network runtime and also an ID the syntax for which is shown in :ref{Line; line-background-shared_calendar-code; line=distribute}.
+Details for how replication works are given in :ref{Section; sec:replication}.
+
+:ref{Lines; line-background-shared_calendar-code; line=selected-entries-signal-expression} :ref{to; line-background-shared_calendar-code; line=selected-entries-signal-expression-end} show a signal expression that accesses the set of calendar entries, and uses Scala’s built-in filter function on sets to select only those entries of the current week.
+The date of each calendar entry is a signal itself, thus this signal expression accesses many nested signals dynamically.
+Note that the set of entries is a replicated reactive, thus the entries themselves – including the nested signals – are replicated on the network.
+
+Finally, we use an explicit observer (:ref{Line; line-background-shared_calendar-code; line=observer-signal}) to notify the UI of changes to the set of selected calendar entries.
+
+
+
+# Conclusion
+label = section-demonstration-summary
+
+:{rescala} is a Scala library that allows developers to define applications that react to changes in the external world.
+Compared to existing paradigms, :{rescala} enables the composition of many small declarative reactions into a :{flowgraph} that represents a complete application.
+The declarative definition of the application allows the runtime of :{rescala} to automatically update the :{flowgraph} whenever any input changes, thus the state of application is always consistent with the external changes that are observed.
+In addition, :{rescala} provides integrations with imperative code to interface with other paradigm provided by the Scala language.
+These integrations are used to provide high-level integration libraries that make certain features (such as UI toolkits) also available in a declarative style.
+Moreover, :{rescala} also enables automatic snapshots and restoration, and provides replication of reactive to other devices in the network.
+We will see both features in more detail in the next section.
+
+
+

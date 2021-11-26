@@ -1,0 +1,30 @@
+format = ["content"]
+outputType = ["pdf"]
+notes = "hide"
+bibliography = "bibliography.bib"
+
+[definitions]
+"settings sloppy" = "true"
+"overflow indicator" = "true"
+cvtr          = "Cvtr"
+fr            = ":math{[\\mathcal{F}_r]}"
+efrp          = "RP" # RP as used in the experience chapter
+glock         = "G-Lock"
+handcrafted   = "Handcrafted"
+parrp         = "ParRP"
+reactifi      = "ReactiFi"
+stmname       = "STM"
+rescala       = "REScala"
+apps          = "dicApps"
+Apps          = "DicApps"
+flowgraph     = "flow graph"
+FlowGraph     = "Flow Graph"
+"xetex fonts" = '''
+\usepackage{fontspec}
+\usepackage{unicode-math}
+\defaultfontfeatures{Mapping=tex-text,Scale=MatchLowercase}
+\setmainfont{Libertinus Serif}
+\setsansfont{Libertinus Sans}
+\setmathfont{Libertinus Math}
+\setmonofont{Hack}
+'''

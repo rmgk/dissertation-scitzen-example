@@ -1,0 +1,42 @@
+# Consistency as a Service
+label = section-related_work-packaged_consistency
+
+There are several designs that provide a more complete “out of the box” solution to develop :{apps}.
+The issue with these solutions in general – especially the commercial solutions – is their inflexibility which makes it harder to develop new kinds of :{apps}.
+
+## Cloud Synchronization Frameworks
+
+There are many vendors that offer “a collaboration back end as a service”.
+Including :link{Microsoft; https://fluidframework.com/},
+:link{Google; https://firebase.google.com/},
+and :link{Twilio; https://www.twilio.com/sync}.
+We have discussed Twilio in the context of our TodoMVC case study in :ref{Section; section-case_study-todomvc}.
+These systems provide a consistent back end as a library and service to the application.
+Using such a service provides applications with a lot of functionality out of the box – if the application fits the particular structure of these frameworks.
+However, in most cases there is no way to develop applications with new kinds of features except hoping that the provider of the service will implement the required functionality.
+
+
+
+## Serverless Becoming Stateful
+
+Serverless computing is a programming environment, where the service provider is responsible for managing all parts of the application stack up to and including the application runtime, for example providing the JVM to run Java applications.
+Serverless computing typically includes a standardized way to send requests to the application running inside the provided runtime.
+Serverless provides the computing power that is needed by many data processing applications, but without a way to store intermediate data in a processing pipeline.
+
+There are newer approaches such as :cite{Cloudburst; DBLP:journals/pvldb/SreekantiWLSGHT20} that add state to serverless functions.
+State is desirable to make representing pipelines simpler, and to represent stateful (fold) operations.
+The goal of these frameworks is presumably to make it easier to develop :{apps} by expanding the scope of serverless computing to stateful applications.
+Most of these approaches seem to work towards a second generation of “map reduce improved” – they want to integrate the runtime into the cloud providers service.
+The gains of this are actually unclear; it seems like it would be much better to enable runtimes such as Flink to make flexible and fast scaling decisions in the cloud, thus providing the same scaling of serverless approaches but with the strong guarantees of an existing data processing framework.
+
+
+
+## Local-first Software
+
+The work on :cite{local-first software; Kleppmann2019LocalFirst} uses eventual consistency to enable offline usage, data privacy, and collaboration.
+Their overall research has a strong focus on usability of a complete application package.
+Their approach combines functional and reactive programming (see :ref{Section; section-related-functional_and_reactive}) with their own :cite{CRDT library for JSON; AutomergeWeb}.
+Thus, their software stack provides a complete environment to develop what they call local-first software – a type of :{apps} that requires to provide usable functionality offline and store all date with the user.
+However, their main research question is whether the kind of applications we imagine can be user-friendly at all.
+Their results are very promising and, because the targeted applications have many similarities, confirm our belief in the :{cvtr} programming paradigm.
+

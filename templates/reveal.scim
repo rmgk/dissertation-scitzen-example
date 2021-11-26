@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>:{tabTitle; default=presentation}</title>
+
+    <link rel="stylesheet" href="dist/reset.css">
+    <link rel="stylesheet" href="dist/reveal.css">
+    <link rel="stylesheet" href="dist/theme/black.css" id="theme">
+
+    <!-- Theme used for syntax highlighted code -->
+    <link rel="stylesheet" href="plugin/highlight/monokai.css" id="highlight-theme">
+<style type="text/css">
+.reveal h1,
+.reveal h2,
+.reveal h3,
+.reveal h4,
+.reveal h5,
+.reveal h6 {
+  text-transform: none;
+}
+.reveal img,
+.reveal video,
+.reveal iframe {
+  max-width: 100%;
+  max-height: 95vh; }
+.reveal section img {
+  background: rgba(255, 255, 255, 0.0);
+  border: 0;
+  box-shadow: none; }
+
+.reveal pre {
+  height: 95vh;
+  white-space: pre-wrap;
+}
+.reveal ul {
+  margin-right: 2em;
+}
+</style>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        :{template content}
+      </div>
+    </div>
+
+    <script src="dist/reveal.js"></script>
+    <script src="plugin/highlight/highlight.js"></script>
+    <script src="plugin/zoom/zoom.js"></script>
+    <script>
+      // More info about initialization & config:
+      // - https://revealjs.com/initialization/
+      // - https://revealjs.com/config/
+      Reveal.initialize({
+        hash: true,
+
+        // Learn about plugins: https://revealjs.com/plugins/
+        plugins: [ RevealHighlight, RevealZoom ],
+        width: "100%", height: "100%",
+        // minScale:0.2, maxScale:2,
+        margin: 0,
+        // Display presentation control arrows
+        controls: false,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: true,
+
+        // Display a presentation progress bar
+        progress: false,
+
+        // Display the page number of the current slide
+        slideNumber: true,
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Push each slide change to the browser history. Implies `hash: true`
+        history: true,
+
+        // Vertical centering of slides
+        center: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 2000,
+
+        // Transition style
+        transition: 'none', // none/fade/slide/convex/concave/zoom
+
+        // Transition style for full page slide backgrounds
+        backgroundTransition: 'none', // none/fade/slide/convex/concave/zoom
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        pdfMaxPagesPerSlide: 1
+});
+    </script>
+  </body>
+</html>
+

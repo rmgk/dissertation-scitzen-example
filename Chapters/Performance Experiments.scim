@@ -1,0 +1,680 @@
+== Performance Experiments
+label = chapter-microbenchmarks
+
+::figure{label=figure-microbenchmarks-frametime}
+  ``image{converter=tex; template=/templates/tikz.scim}
+    \begin{tikzpicture}
+    \begin{axis}[
+      xbar, xmin=0, xmax=7.2,
+      width=28cm, height=3.5cm, enlarge y limits=0.4,
+      xlabel={milliseconds},
+      symbolic y coords={Frame,User code,Transaction},
+      xtick={0,1,2,3,4,5,6,7},
+      ytick=data,
+      nodes near coords, nodes near coords align={horizontal},
+    ]
+    \addplot[black,fill=lightgray,
+      error bars/.cd,
+      x dir=both,
+      x explicit
+    ] coordinates {
+      (6.944,Frame) +- (0,0)
+      (6.933,User code) +- (0,0)
+      (0.011,Transaction) +- (0,0)
+    };
+    \end{axis}
+    \end{tikzpicture}
+  ``
+  Frame time versus transaction time.
+::
+
+This chapter contains detailed performance evaluation of individual parts and features of :{rescala}.
+The evaluation often compares cost of large operations that are still only in the order of microseconds.
+We do believe that small improvements for fundamental technologies such as the implementation of a programming paradigm are worthwhile.
+However, we first want to discuss several rough estimations that should give an intuition of what kinds of :{apps} the performance of :{rescala} is suitable for.
+
+First, it is important to note that :{rescala} is typically not a performance critical part of :{apps} as shown by our case studies (:ref{Chapter; chapter-case_studies}).
+The programming paradigm describes the outermost layer of an application that reacts to individual user inputs – transactions in the :{flowgraph} are normally not executed inside tight loops as is the case with these performance experiments.
+To give an intuition a 144Hz Monitor renders a frame every 7 milliseconds.
+A transaction changing 100 reactives (more than required for any of our interactive case studies) takes roughly 11 microseconds using the LaptopHigh configuration detailed below.
+That is, the application has 99.84% of its time budget remaining for something that is not :{rescala}.
+See :ref{Figure; figure-microbenchmarks-frametime} for a visualization to get a better impression of just how little time a transaction requires.
+
+A different consideration compared to execution time is memory usage.
+The required memory of :{apps} is often a binary problem: either a device has enough memory to run an application or not.
+The required memory for a single reactive in the :{flowgraph} is about 400 bytes on the JVM.
+We have successfully experimented with creating graphs containing up to 30 million reactives requiring about 12 GB to store the graph.
+A device then requires several more gigabytes of memory to process transactions over all the reactives.
+The processing time of such large transactions depends on the graph layout.
+In the worst case layout, transactions of 10 million reactives are possible in the order of seconds on our LaptopHigh system (see below).
+Very wide graphs cause more problems to the propagation algorithm, because all reactives at the same depth in the graph are added at the same time into a priority queue resulting in a lot of computation time spend on adding and removing elements from that queue.
+We have no indication that any realistic case study will ever reach close to these numbers of reactives, thus we do not concern ourselves with the memory requirement of the :{flowgraph}.
+
+Regarding memory requirement, the state of a single reactive – especially of CRDT reactives – may quickly reach dozens of kilobytes.
+Encoding of such large data structures into bytes (for snapshots and synchronization) may take more than the target frame time of 7 milliseconds – especially when executing on the Web platform.
+However, the focus of our performance experiments lies on the implementation of the core programming paradigm which encoding and decoding performance does not belong to.
+We have discussed in :ref{Chapter; chapter-formalization} how the programming paradigm can minimize the amount of state in a snapshot and the amount of state shared over the network.
+There are possible technical improvements available to applications such as the use of more efficient :cite{codecs; JsoniterBenchmarks}.
+We have also shown in :ref{Chapter; chapter-case_studies} that performance is acceptable for realistic applications.
+
+Now that we have given an outline of the extreme cases where performance may become an issue, it is still valuable to measure the precise performance impact of different implementations of :{rescala} and its extensions.
+We take a closer look at snapshot performance, at the performance behavior of different schedulers, and of language integrated error propagation.
+In addition, these benchmarks exercise the basic performance behavior of reactives and transactions, thus providing a general overview of the performance of :{rescala}.
+All benchmarks in this thesis, as well as many more specific experiments can be found in the :emph{microbenchmarks} project of the :{rescala} :link{repository; https://github.com/rescala-lang/REScala}.
+
+
+
+# Setup and Threats to Validity
+label = section-performance-setup-validity
+
+This thesis presents performance results acquired over the course of multiple years, multiple devices, and multiple runtimes.
+Performance does not necessarily increase over time, workarounds of CPU security bugs have caused slowdowns, the Scala compiler has changed the collection library for better maintainability, and :{rescala} also sometimes favors simpler code over raw performance.
+Thus, we try to provide the exact context for each of the benchmarks with the note that your mileage may vary.
+The following systems have been used for experiments and case studies:
+
+• Cluster:
+  Intel Xeon E5-2670 CPUs with 16 cores at 2.6 - 3.3 GHz (scaling based on core usage); compiled with Scala 2.11.{7,8}; 64-Bit Oracle JRE 8u74 with 1 GB heap; CentOS Linux 7.2.
+• LaptopMid:
+  Intel(R) Core(TM) i5-5300U with 2 cores (laptop CPU); compiled with Scala 2.12.x; Ubuntu 18.10 (64-bit).
+• Browser:
+  Same as LaptopMid using Chromium 73.0.3683.75.
+• LaptopHigh:
+  Intel(R) Core(TM) i7-10510U CPU @ 1.80GHz with 4 cores (8 threads) scaling up to 3.3GHz; compiled with Scala 2.13.4; OpenJDK version "14.0.2" 2020-07-14; Ubuntu 20.10 (64-bit).
+
+Our JVM benchmarks are implemented using the OpenJDK benchmarking framework Java Microbenchmark :cite{Harness; JMH}.
+If not stated otherwise results are the average of at least 25 iterations of the measured benchmark.
+To reduce the influence of non-deterministic optimizations,
+we fork the JVM 5 times, each doing 5 iterations with proper warm-up.
+Each iteration runs for about 1 second.
+
+There are both internal and external threats to the validity of our results.
+Internal threats include the selection of benchmarks and their implementation.
+There is no agreed upon benchmark suite for :{apps}, thus our selection of benchmarks may be biased towards the strengths of :{rescala}.
+We also use the same set of benchmarks for continued performance monitoring and improvements of performance over time that we use for evaluation, thus :{rescala} is potentially optimized for these specific cases.
+Finally, we are experts in using :{rescala} but not so for systems we compare against, thus it is possible that the implementations of the experiments for :{rescala} are of higher quality.
+The external threat is that the benchmarks may be too small and not sufficiently diverse for the results to be generalizable to :{apps}.
+
+
+# Snapshots and Restoration
+label = section-performance-snapshots
+
+Crash tolerance in :{rescala} has a synergy with the transactional semantics thus their performance is tightly related.
+As a trend, restoration reduces throughput.
+In the following, we evaluate our claim that the performance impact of restoration on typical :{rescala} applications is reasonable.
+The experiments in this section use the Cluster (c.f., :ref{Section; section-performance-setup-validity}) type of devices.
+Specifically, we answer the following questions:
+
+• RQ1:
+    What is the performance overhead introduced by our snapshotting mechanism?
+• RQ2:
+    What is the performance trade-off between restoring state from the snapshot versus recomputing the state?
+• RQ3:
+    How does the performance of our recovery mechanism compare to the performance of the recovery mechanism of an industrial-strength data streaming system?
+
+
+
+## (RQ1) Overhead of Snapshots
+
+Snapshots happen after every transaction on the :{flowgraph} and affect the overall application performance.
+Snapshot overhead consists of the internal overhead for determining all the updated
+state and of the overhead for encoding that state into bytes.
+The snapshots in these experiments are stored in an in-memory database,
+because we do not want to measure time spent writing to disk,
+since this overhead is not specific to our solution.
+We quantify the snapshot overhead as a function of the number of folds in an application, since
+only the state of fold reactives is included in a snapshot. For this purpose, we
+parameterize our benchmarks with the number of fold reactives in the application.
+
+
+
+::figure{label=fig:evaluation:overhead-foldPercentage}
+  :image{/Figures/faults/benchmarks/foldPercentage100.pdf; maxwidth=0.5}
+
+  The cost of snapshots. X-axis is the percentage of fold reactives in the graph.
+::
+
+Figure :ref{fig:evaluation:overhead-foldPercentage} shows the throughput for
+a :{flowgraph} consisting of a single input event with 100 reactives derived from that input.
+On the x-axis is the percentage of fold reactives out of all the derived reactives.
+We selected this topology since it allows us to create a full snapshot of all fold reactives with a single input
+change. To factor out the influence of computations not involved in snapshotting,
+user-defined computations of both folds and stateless derived reactives
+only do simple integer arithmetic with negligible overhead.
+We executed the benchmark twice, with and without snapshots enabled.
+The relative throughput is
+on the y-axis of Figure :ref{fig:evaluation:overhead-foldPercentage} (higher is better).
+
+We observe that the throughput of the benchmark with snapshotting is
+overall lower than without and further decreases when the number of fold reactives is higher.
+In the best case, i.e., there are no fold reactives, the overhead is minimal;
+our solution
+incurs performance overhead only when state is actually stored, i.e.,
+there is no overhead for an active but unused feature.
+In the worst case, i.e., when every reactive is a fold,
+the throughput of the run with snapshots is still
+about 58% of that with no snapshot.
+For typical reactive programs, – which contain roughly 14% fold :cite{signals; Salvaneschi2014} – the relative throughput is 85%.
+This experiment is also rather extreme, because it is unusual that all reactives in an application are changed at the same time.
+Even in the worst case scenario :{rescala} only requires 33 microseconds per transaction (each changing 101 reactives), which we still consider reasonable performance for real applications.
+
+
+::figure{label=figure-evaluation-restoration-rq2}
+  :image{/Figures/faults/benchmarks/restoring-fonts.pdf; maxwidth=0.36}
+  :image{/Figures/faults/benchmarks/restoreVsDerive.pdf; maxwidth=0.5}
+
+  Left: cost of restoration. Right: restoring vs. recomputing lists of various sizes.
+::
+
+:% fig:evaluation:restoring-overhead-compared-to-initialization
+:% ::figure{label=fig:evaluation:deriving-vs-restoring}
+
+:% ::
+
+
+
+## (RQ2) Restoring From Snapshots Versus Recomputing
+
+We first quantify the overall cost that recovery adds when restarting the application.
+We also quantify the trade-off between taking minimal snapshots versus taking bigger snapshots.
+
+Regarding the cost of recovery, Figure :ref{figure-evaluation-restoration-rq2} (left) shows the results
+of measuring the cost of recovery for the graph from (RQ1).
+Each bar on the x-axis shows the throughput of creating a graph
+(a) without any support for fault tolerance thus no overhead for restoration,
+(b) with support for fault tolerance but when restoring from an empty (fresh) snapshot,
+as is the case when an application is started for the first time,
+and (c) when restoring the graph from an existing fully populated snapshot.
+The overhead we observe in the last case is
+the result of creating the initial snapshot and restoring
+the (serialized) values from the snapshot.
+We conclude from :ref{Figure; figure-evaluation-restoration-rq2} (left) that while restoration has a certain overhead,
+the cost is comparable to normal application startup times,
+since :{rescala} restores the graph of 100 reactives twice per millisecond,
+compared to starting the application, which is performed 2.5 times per millisecond.
+
+Regarding the trade-off between minimal snapshot and recomputation, where our approach by default minimizes the amount of state that is stored in snapshots.
+That is, instead of restoring derived state we recompute it.
+Intuitively, one would assume that our restoration has higher overhead
+compared to one that starts from a maximal snapshot, as it has to
+recompute more.
+However, a small experiment indicates that this does
+not necessarily have to be the case.
+In the experiment, we run two versions (labeled Restore and
+Derive) of a benchmark with a reactive
+that stores a list containing integers 1 to N.
+In the Restore version the list is part of the snapshot, while
+in the Derive version the snapshot only contains the size of the list
+and the list itself is recomputed during restoration.
+The graphs in Figure :ref{figure-evaluation-restoration-rq2} (right) show
+the results, with N in the x-axis and throughput in the y-axis.
+We observe that both restoring and recomputing
+derived state get linearly more expensive with the size of N.
+We also observe that recomputing the list given its size is faster than restoring from a complete snapshot.
+This indicates that the performance impact of deriving as much state as possible is highly dependent on the involved operations.
+
+::figure{label=fig:evaluation:flink-vs-rescala}
+  :image{/Figures/faults/benchmarks/flinkVSrescala-font.pdf; maxwidth=0.8}
+  Flink vs. :{rescala} snapshot performance.
+::
+
+## (RQ3) Comparison to an Industrial-strength Data Streaming System
+
+Our objective in this experiment is to compare the performance of our
+implementation for snapshots and recovery to a functionally similar industrial-strength system.
+The objective is to measure an upper bound for the performance of our :{rescala}.
+We compare against :cite{Flink; Alexandrov2014TheSP}, a state-of-the-art, big data processing engine for real-time analytics
+used, among the others, in the Alibaba real-time search ranking, in Zalando's business process monitoring and in
+Netflix's complex event processing :cite{system; flinkSuccess}.
+Flink is suitable as a reference due to the following reasons:
+(a) it is functionally similar to reactive applications in that it
+also manages state inside a :{flowgraph} (a property it shares with other
+streaming systems), (b) it is implemented in Scala, hence
+the runtime environment is similar to ours, (c)
+it is well known for its focus on fault tolerance,
+(d) it is also possible to enable/disable snapshots, and (e) both Flink and :{rescala} serialize
+snapshots to memory.
+
+We implemented a similar graph structure as in (RQ1) for Flink.
+However, Flink and :{rescala} target different usage scenarios.
+:{rescala} immediately reacts to individual occurrences of input events, such as button clicks.
+Flink, on the other hand, processes and aggregates complete input streams of data.
+Hence, we do not compare the absolute performance of Flink and :{rescala},
+but only measure the relative overhead of creating snapshots.
+
+In Figure :ref{fig:evaluation:flink-vs-rescala},
+we show the relative throughput with and without snapshots (checkpoints in Flink terminology) within the same system.
+Snapshots in Flink are created periodically instead of after each update
+(we have created them every 10 ms, 100 ms, and 1000 ms, respectively),
+and always include the complete state of the system.
+While the overhead of :{rescala} is higher when a full snapshot is created,
+in the case when only 30% of the :{flowgraph} is stored in the snapshot
+– which is the realistic case – the relative overheads of both systems are similar, with snapshots slowing down the systems to 86% and 80% of normal throughput respectively.
+
+We conclude that the performance of our snapshot algorithm has reasonable overhead for our use cases.
+The use of time-based snapshots in Flink may be an interesting addition to :{rescala} for certain use cases.
+However, we currently believe that – while our approach behaves worse in benchmarks – it is more useful to snapshot after every interaction, because our case studies show that typical :{apps} may only have interactions every couple of seconds.
+
+
+
+
+# Schedulers and Transaction Performance
+label = sec:evaluation
+
+
+:{rescala} has multiple schedulers as discussed in :ref{Chapter; chapter-project}.
+The initial motivation of these schedulers was the support for parallel execution.
+Parallel execution became necessary when :{rescala} transitioned to supporting distribution and collaboration, because transactions are no longer started only by user interactions but may happen at any time caused by network messages.
+Efficient parallelization may also allow use of :{rescala} embedded into applications that require efficient use of multiple processors such as simulations or data processing applications.
+
+We compare four different implementations of locking strategies for schedulers all using the same implementation for the actual propagation of changes to keep them comparable.
+See :ref{Section; section-implementation-schedulers} for the detailed explanation of schedulers.
+The default scheduler of :{rescala} on the JVM is :{parrp}.
+:{parrp} supports multiple transactions executing in parallel.
+The default scheduler for the Web platform where parallelism is unavailable is :{glock}.
+:{glock} uses a single global lock to synchronize changes when executed on the JVM.
+:{stmname} delegates scheduling to :cite{ScalaSTM; Bronson10ccstm:a}, a former state-of-the-art Software Transactional Memory implementation.
+:{handcrafted} is not a single scheduler, but instead a class of fine-grained locking hand-crafted for each application.
+Performance heavily depends on the features used by an application, thus the evaluation investigates how these approach perform in the presence of these features:
+
+• RQ1:
+  Only static dependencies in the :{flowgraph}.
+• RQ2:
+  With dynamic dependencies in the :{flowgraph}.
+• RQ3:
+  With bottlenecks in the :{flowgraph} that cause contention between transactions.
+• RQ4:
+  When there are read only transactions favoring the opportunistic approach of :{stmname}.
+• RQ5:
+  With a varying set of workloads and topologies.
+
+RQ1 and RQ2 quantify scalability and performance overhead.
+RQ3 covers the common topology of many inputs funneling into at few aggregation points,
+e.g., user interfaces displaying many values in one window or a server aggregating values of many clients.
+RQ4 covers a common workload for which STM and database benchmarks are :cite{optimized; jung_serializable_2011,saha_mcrt-stm:_2006,saad_hyflow:_2011}.
+RQ5 explores the impact of different graph topologies on scalability.
+The experiments are executed using the Cluster (c.f., :ref{Section; section-performance-setup-validity}) type of devices.
+
+## RQ1, RQ2, and the Dining Philosophers
+
+In these experiments, we use our interpretation of the dining philosophers problem as the topology for the :{flowgraph}.
+In this topology there are a fixed number of philosophers and the same number of forks arranged in a circle with alternating placement of philosophers and forks.
+Each philosopher has a source reactive that models the target state of the philosopher (eating or thinking).
+Each fork is derived from the two adjacent philosophers and its state describes which philosopher is using the fork.
+The actual state of the philosopher (called its sight) is derived from the two forks next to that philosopher and depends on whether that philosopher has acquired both forks.
+Each operation measured in the benchmark consists of two transactions: one philosopher switching form eating to thinking and back.
+Philosopher are assigned to threads round-robin, each thread randomly updates one assigned philosopher.
+E.g., with 16 threads and 64 philosophers, thread #0 randomly updates one of :math{"\{p_0, p_{16}, p_{32}, p_{48}\}"} for a single measurement.
+
+::figure{label=fig:bench:philosophers_interference}
+  ``image{converter=tex; template=/templates/parrp-eval.scim}
+    \centering
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/static-philosophers-16/alternating}
+    \put(16,51){ (a) 16 Philosophers}
+    \put(-1,17){\rotatebox{90}{Ops/ms}}
+    \put(-5,1){Threads}
+    \end{overpic}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/static-philosophers-32/alternating}
+    \put(16,51){(b) 32 Philosophers}
+    \end{overpic}
+    \vspace{2em}
+    \\
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/static-philosophers-64/alternating}
+    \put(-1,17){\rotatebox{90}{Ops/ms}}
+    \put(-5,1){Threads}
+    \put(16,51){(c) 64 Philosophers}
+    \end{overpic}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/static-philosophers-128/alternating}
+    \put(16,51){(d) 128 Philosophers}
+    \end{overpic}
+    \\
+    \vspace{0.3cm}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
+    \end{overpic}
+  ``
+  Throughput (ops/ms) per active threads, static graph.
+::
+
+To answer RQ1, we measure throughput (steps per time) with an increasing number of active threads.
+:ref{Figure; fig:bench:philosophers_interference} shows throughput for 16, 32, 64 and 128 philosophers.
+More philosophers reduce the frequency of interactions between updates.
+In each case, we increase the number of threads from 1 to 16.
+Performance of :{glock} and :{handcrafted} degrades under high contention due to lack of contention management.
+Note that more recent versions of the JVM seem to solve the contention issue for :{glock} removing the steep decline of throughput when adding a second thread.
+:{parrp} and :{stmname} both gain performance from more threads, even under high contention.
+The overhead of :{stmname} over :{handcrafted} is comparable to prior benchmarks of :cite{STM; harmanci_atomic_2011,harris_language_2003},
+finding, e.g., fine-grained locking 1.8x faster than :cite{STM; saha_mcrt-stm:_2006}.
+
+
+::figure{label=fig:bench:philosophers_dynamic_interference_alternating}
+  ``image{converter=tex; template=/templates/parrp-eval.scim}
+    \centering
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-16/alternating}
+    \put(16,51){ (a) 16 Philosophers}
+    \put(-1,17){\rotatebox{90}{Ops/ms}}
+    \put(-5,1){Threads}
+    \end{overpic}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-32/alternating}
+    \put(16,51){(b) 32 Philosophers}
+    \end{overpic}
+    \vspace{2em}
+    \\
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-64/alternating}
+    \put(-1,17){\rotatebox{90}{Ops/ms}}
+    \put(-5,1){Threads}
+    \put(16,51){(c) 64 Philosophers}
+    \end{overpic}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-128/alternating}
+    \put(16,51){(d) 128 Philosophers}
+    \end{overpic}
+    \\
+    \vspace{0.3cm}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
+    \end{overpic}
+  ``
+  Throughput (ops/ms) per active threads, dynamic graph.
+::
+
+For RQ2, :ref{Figure; fig:bench:philosophers_dynamic_interference_alternating} shows results of the same experiments on philosophers with a dynamic :{flowgraph}.
+The relations between schedulers are similar to those from :ref{Figure; fig:bench:philosophers_interference}.
+The absolute numbers are overall lower, indicating that the cost of edge changes is significant compared to scheduling overhead.
+
+
+
+::figure{label=fig:bench:chat_server}
+  ``image{converter=tex; template=/templates/parrp-eval.scim}
+    \centering
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/ChatServer/4}
+    \put(16,51){ (a) 4 chat rooms}
+    \put(-1,17){\rotatebox{90}{Ops/ms}}
+    \put(-5,1){Threads}
+    \end{overpic}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/ChatServer/8}
+    \put(16,51){(b) 8 chat rooms}
+    \end{overpic}
+    \vspace{2em}
+    \\
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/ChatServer/16}
+    \put(-1,17){\rotatebox{90}{Ops/ms}}
+    \put(-5,1){Threads}
+    \put(16,51){(c) 16 chat rooms}
+    \end{overpic}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/ChatServer/32}
+    \put(16,51){(d) 32 chat rooms}
+    \end{overpic}
+    \\
+    \vspace{0.3cm}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
+    \end{overpic}
+  ``
+  Throughput (ops/ms) for the chat server depending on the number of rooms.
+::
+
+## RQ3 and the Chat Server
+
+In the chat server experiment each thread is a client joining exactly two chat rooms.
+Each step involves sending one message to both rooms.
+The order of messages in each room is consistent, thus, each chat room forms a bottleneck, because only a single client may write a message at the same time.
+:ref{Figure; fig:bench:chat_server} shows the throughput depending on the number of clients (threads) and rooms.
+The vertical bars represent the point at which all rooms are occupied by a client and additional clients only increase contention.
+All schedulers (except :{glock}) display a near-linear increase in performance up to this bottleneck.
+For more threads, :{parrp} behaves similar to :{handcrafted}, which can handle contention well here due to the simple structure of one lock per room.
+:{stmname} struggles, as the underlying STM is not designed for high numbers of write conflicts.
+
+::figure{label=fig:bench:read_write_comparison}
+  ``image{converter=tex; template=/templates/parrp-eval.scim}
+    \centering
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/BankAccounts/readProbability8}
+    \put(16,51){(a) 8 sets of size 32}
+    \put(-5,20){\rotatebox{90}{Ops/ms}}
+    \put(-5,1){Threads}
+    \end{overpic}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/BankAccounts/readProbability16}
+    \put(16,51){(b) 16 sets of size 16}
+    \end{overpic}
+    \vspace{2em}
+    \\
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/BankAccounts/readProbability32}
+    \put(-5,20){\rotatebox{90}{Ops/ms}}
+    \put(-5,1){Threads}
+    \put(16,51){(c) 32 sets of size 8}
+    \end{overpic}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/BankAccounts/readProbability64}
+    \put(16,51){(d) 64 sets of size 4}
+    \end{overpic}
+    \\
+    \vspace{0.3cm}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
+    \end{overpic}
+  ``
+  Throughput (ops/ms) per relative number of read operations depending on read windows sizes.
+::
+
+## RQ4 and the Bank Accounts
+
+We address RQ4 using a bank account benchmark.
+There are 256 accounts and two types of transaction, :math{T_W} and :math{T_R}.
+:math{T_W} transfers money between two randomly chosen accounts, i.e., a write transaction.
+For :math{T_R}, accounts are divided into sets of 8, 16, 32 and 64.
+:math{T_R} picks one set at random and computes the total value of all contained accounts, i.e., a read-only transaction.
+The benchmark always runs 16 threads, but varies the percentage of :math{T_R} vs :math{T_W}, 0 meaning only :math{T_W} and 1 only :math{T_R}.
+:ref{Figure; fig:bench:read_write_comparison} shows the results.
+:{parrp} and :{handcrafted} both use exclusive locks for reads, so each :math{T_R}
+needs exclusive access to the whole set of accounts.
+Thus, more :math{T_R} drastically decrease their throughput, because :math{T_R} causes more contention by accessing more accounts than :math{T_W}.
+:{stmname} does not exhibit significant improvements with an increased ratio of :math{T_R},
+the higher concurrency is counter-acted by the bigger size of :math{T_R}.
+As interactions in :{apps} mainly consist of reacting to external change, workloads of many large read-only transactions are rare.
+Given that and that the scenario is biased towards :{stmname} due to exclusive read locks in :{parrp}, we interpret the results positively, as :{parrp} shows limited performance degradation.
+
+
+::figure{label=fig:bench:other_topologies}
+  ``image{converter=tex; template=/templates/parrp-eval.scim}
+    \begin{overpic}[width=0.32\textwidth]{../../../Figures/Evaluation/figures/benchmark2/bargraph/8parallelizable}
+    \put(-3,5){\rotatebox{90}{\small Speedup}}
+    \put(12,28.5){\small (a) Supporting parallelism}
+    \put(18,-4){\scriptsize Build}
+    \put(31,-4){\scriptsize MultiFan}
+    \put(48,-4){\scriptsize Philosophers}
+    \put(71,-4){\scriptsize Read}
+    \put(84,-4){\scriptsize Structures}
+    \end{overpic}
+    \begin{overpic}[width=0.32\textwidth]{../../../Figures/Evaluation/figures/benchmark2/bargraph/8non-parallelizable}
+    \put(12,28.5){\small (b) Prohibiting parallelism}
+    \put(14,-4){\scriptsize DynamicStack}
+    \put(38,-4){\scriptsize ReverseFan}
+    \put(57,-4){\scriptsize SingleSwitch}
+    \put(80,-4){\scriptsize SingleWrite}
+    \end{overpic}
+    \vspace{3em}
+    \\
+    \begin{overpic}[width=0.32\textwidth]{../../../Figures/Evaluation/figures/benchmark2/bargraph/8multiplied}
+    \put(-3,5){\rotatebox{90}{\small Speedup}}
+    \put(12,28.5){\small (c) Per thread copies}
+    \put(18,-4){\scriptsize EventSeq}
+    \put(37,-4){\scriptsize Fan}
+    \put(50,-4){\scriptsize Natural}
+    \put(64,-4){\scriptsize Philosophers}
+    \put(85,-4){\scriptsize SignalSeq}
+    \end{overpic}
+    \\
+  ``
+  Throughput of different graph configurations relative to G-Lock performance using 8 threads.
+::
+
+
+::figure{label=fig:bench:reversefan_philo}
+  ``image{converter=tex; template=/templates/parrp-eval.scim}
+    \centering
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/simple/ReverseFan}
+    \put(16,51){(a) Reverse fan}
+    \put(-2,17){\rotatebox{90}{Ops/ms}}
+    \put(-5,1){Threads}
+    \end{overpic}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-128/noconflict}
+    \put(16,51){(b) Philosophers}
+    \end{overpic}
+    \\
+    \vspace{0.3cm}
+    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
+    \end{overpic}
+  ``
+  (a) ReverseFan detail (b) Philosopher detail.
+::
+
+## RQ5 and the Artificial Topology
+
+For RQ5 we evaluate different workloads on artificially generated topologies to cover topologies that are more extreme than the experiments before above.
+:ref{Figure; fig:bench:other_topologies} displays how the schedulers perform in a variety of artificial topologies by comparing the throughput achieved by 8 threads relative to :{glock}.
+We group workloads depending on parallelization properties.
+:ref{Figure; fig:bench:other_topologies} (a) shows workloads that are naturally parallelizable.
+Speed-up depends on how much parallelism the topology allows.
+
+:ref{Figure; fig:bench:other_topologies} (b) shows topologies that do not allow parallelism, hence :{handcrafted} degenerates to a manual implementation of :{glock}.
+These benchmarks test contention management.
+:ref{Figure; fig:bench:reversefan_philo} (a) shows the experiment results for 1 to 16 threads of the “ReverseFan” as an example for a topology that is not parallelizable.
+The data point of 8 threads shown in :ref{Figure; fig:bench:other_topologies} is marked with a bar.
+The other non-parallelizable exhibit similar behavior.
+:{parrp} is better than the JVM's built-in contention management used by :{glock}.
+This JVM issue has since been fixed in newer JVM versions.
+:{stmname} does not deal well with high contention in typical RP workloads (i.e., a significant ratio of writes).
+
+:ref{Figure; fig:bench:other_topologies} (c) shows applications where updates are admitted such that they never interact.
+:ref{Figure; fig:bench:reversefan_philo} (b) shows the full benchmark (1 to 16 threads) for the “Philosopher” example in this group, the others are again similar.
+The performance gain per thread lessens when adding more threads.
+We speculate this is due to the processor slowing its clock speed under high load and the overhead due to the communication between the two processor sockets when more than 8 cores are used.
+Yet, at 8 threads we observe speed-ups of 6x.
+
+
+
+## Conclusion of the Parallelization Behavior of the Scheduler
+Our concurrency control scales well with the number of threads and
+the overhead is always less than 100μs per transaction.
+Our scheduler outperforms the other generic scheduler (:{stmname}).
+:{handcrafted} is, as expected, faster than generic scheduling.
+Yet, besides being tedious to devise, it is also error-prone and fragile in presence
+of software evolution and :cite{composition; Gu:2015:CHT:2786805.2786815}.
+Moreover, proving serializability of hand-crafted locking schemes is hard,
+and they are thus often excluded from :cite{evaluations; herlihy_software_2003}.
+:{parrp} is sound by design, including correctness preservation through composition.
+
+While the parallelization of schedulers may currently not be important for most :{apps}, we believe that these results show that :{rescala} has potential to be applied in scenarios where efficient use of available processing power is important.
+This aligns with our overall goal to show that the :{cvtr} programming paradigm is applicable to many scenarios.
+It also provides an opportunity for future :{apps} to make better use of such resources and integrate computation intensive tasks in the same programming paradigm.
+
+
+
+
+
+
+
+# Performance Effects of Language-Integrated Error Propagation
+label = section-performance-error_propagation
+
+In Section :ref{chapter-errors_exceptions}, we motivated the need for language-integrated
+error propagation for the quality of application design.
+We empirically provided evidence that our approach to error propagation indeed barely pollutes the application code in :ref{Section; section-case_study-error_propagation}.
+In this section, we ask: how does language-integrated error propagation affect application performance?
+
+The experiments presented below analyze the potential performance effects of error handling.
+Specifically, we analyze the potential performance trade-offs of the language-integrated
+error propagation compared to programmatic error handling,
+and the overhead of the error propagation
+system in the absence of errors.
+The experiments are executed on the LaptopMid (c.f., :ref{Section; section-performance-setup-validity}) type of devices.
+
+These experiments show that there is no additional cost for error propagation.
+As discussed in Section :ref{sec:implementation-errors}, this is due to the tight integration of errors into the existing runtime.
+Moreover, language-integrated error
+propagation exhibits better application performance compared to programmatic error handling.
+
+::figure{label=fig:evaluation:monadic-errors}
+  ``image{converter=tex; template=/templates/tikz.scim}
+    \begin{tikzpicture}
+    \begin{axis}[
+      xbar, xmin=0,
+      width=12cm, height=3cm, enlarge y limits=0.75,
+      xlabel={Ops/ms},
+      xtick={0,1,2},
+      symbolic y coords={Try,Integrated},
+      ytick=data,
+      nodes near coords, nodes near coords align={horizontal},
+    ]
+    \addplot[black,fill=lightgray,
+      error bars/.cd,
+      x dir=both,
+      x explicit
+    ] coordinates {(2.03,Try) +- (0,0) (2.36,Integrated) +- (0,0)};
+    \end{axis}
+    \end{tikzpicture}
+  ``
+  Integrated error propagation versus :code{Try}-based solution.
+::
+
+To compare different approaches to error handling we implemented an experiment using Scala's :code{Try} to propagate errors handle errors,
+i.e., every :code{Signal[A]} is rewritten to be a :code{Signal[Try[A]]}.
+Using :code{Try} is the idiomatic way to represent errors as values in Scala, similar to the :code{Maybe} data type in Haskell.
+As shown in Figure :ref{fig:evaluation:monadic-errors}, our solution outperforms the solution that uses :code{Try}-wrappers.
+This improvement is due to the fact that language integration integrates error propagation into the internal data structures of the language runtime, while :code{Try}-wrappers require an additional layer of indirection.
+
+To measure the cost of support for error propagation even when no errors occur, we use an experiment setup called :emph{natural graph}.
+This is an application that produces a :{flowgraph} with 25 reactives that are connected in a way to mimic the average :cite{application; Salvaneschi2014}.
+All user-defined computations only perform arithmetic additions
+to minimize the amount of work that is spent on actual computation and maximize the relative overhead of the error propagation.
+For this experiment, we did not measure any performance difference between a version of :{rescala} with error propagation and a version without.
+
+We believe that a general advantage of high-level programming paradigms such as :{cvtr} is that they often enable additional features at no additional cost.
+In this case, the synergy is due to the fact that :{rescala} can automatically integrate different concerns into a single runtime abstraction, thus paying the cost only once.
+
+
+
+# Combined Effects of Errors and Snapshots
+
+::figure{label=fig:evaluation:overhead-barcharts}
+  :image{/Figures/faults/benchmarks/barchart-evaluation_errors+snapshots.svg}
+  Cost of snapshots and errors. Throughput measured in: Errors per 100 ms; Restore×0 per 10 ms; Restore×1 and ×10 per 1 ms; others per 1 μs.
+::
+
+To understand the combined impact of snapshots and error propagation on :{rescala} we run several experiments with and without support for error propagation and snapshots.
+We are especially interested in the overhead for graphs that do not require these features.
+The experiments are executed on the LaptopMid (c.f., :ref{Section; section-performance-setup-validity}) type of devices
+Figure :ref{fig:evaluation:overhead-barcharts} shows the following benchmarks:
+
+• Errors:
+    A :{flowgraph} that is meant to have a representative structure of typical reactive programs.
+• Evt+Map:
+    A graph with an input event and a map operation, here no snapshots need to be stored because events are not included in snapshots.
+• Evt+Count:
+    Counts the number of the input event occurrences. This setup requires a single reactive constituting half of the :{flowgraph} to be stored.
+• Evt+Count×10:
+    Same as before, but stores 10 count reactives derived from the same event.
+• Var:
+   A single var that is included in the snapshot.
+• Restore×0:
+    Time required to restore the same graph as Evt+Map.
+    The graph does not require restoration, so we measure pure overhead.
+• Restore×1 & Restore×10:
+    Restore the graphs of Evt+Count and Evt+Count×10.
+
+The results uniformly show that there seems to be a very slight overhead associated with errors and snapshots.
+However, the overhead is so negligible that we feel confident in always activating these features.
+Thus, support for snapshots and error propagation is always available in :{rescala} applications.
+
+
+
+# Conclusion
+
+We want :{rescala} to be useful in as many cases as possible.
+The better the performance of the implementation the easier for application developers to choose :{rescala} without worrying about trade-offs.
+Thus, our evaluation is focused on the differences between alternate implementations and the impact of optional features on the execution performance.
+We do believe performance of :{rescala} to be excellent for all the use cases we envision.
+One of the reasons for the good performance is that
+:{rescala} includes the discussed performance experiments as part of its development process.
+We believe that especially the performance of executing transactions and generating the :{flowgraph} is pretty well understood, and thus they also have excellent performance.
+Similar arguments apply for both the error propagation and restoration.
+
+However, the overhead of :{rescala} is usually only a small part of the computational effort required by applications.
+The focus of future performance evaluation of :{rescala} will shift towards more application specific integrations.
+There is a large impact of expensive user-defined functions executed as part of transactions.
+Some of these user-defined functions – such as integrations with the HTML DOM, and merge functions for CRTDs – could even be argued to be part of :{rescala} itself.
+An interesting future extension to :{rescala} is the ability to monitor performance of user-defined computations in individual reactives, to provide developers with feedback on performance bottlenecks within their application.
+

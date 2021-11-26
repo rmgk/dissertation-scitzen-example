@@ -1,0 +1,568 @@
+== Errors and Exceptions
+label = chapter-errors_exceptions
+
+The use of convergence and eventual consistency in :{cvtr} means that developers never have to deal with explicit error handling, but there are still cases where they may want to.
+First, errors also occur in contexts – such as operating with files – that are not covered by :{cvtr}.
+Second, sometimes an application wants to behave differently when connectivity could not be established, for example, informing the user with a status icon or using an approximation of the remote value.
+Especially when interfacing with remote systems not implemented in :{rescala} both of the above apply and developers have application specific strategies how to handle such cases.
+
+We first give an intuition of how error propagation works in :{rescala}, then discuss how error handling looks like by modifying the shared calendar example from :ref{Chapter; chapter-demonstration}, and finally compare the syntactic overhead of built-in error propagation with encoding errors as values.
+Before we conclude, we discuss a generalization of error propagation to multiple different channels (values and errors).
+Our case studies in :ref{Chapter; chapter-case_studies} suggest that our API for error handling aligns very well with the native mechanism of Scala and our performance experiments in :ref{Chapter; chapter-microbenchmarks} show that error handling has no additional runtime cost.
+
+
+# Intuition of Error Propagation
+
+Many imperative, object-oriented languages such as :cite{Java; Gosling1996TheJL} or :cite{C++; Koenig1990ExceptionHF} have an exception handling :cite{mechanism; Buhr2000}.
+To integrate with the existing language mechanisms the built-in error handling strategy of :{rescala} is based on exceptions.
+
+Exceptions usually propagate up the call stack until the closest matching handler.
+The rationale is that code locations up in the stack have more information to handle the exception and automatically propagating exceptions prevents error handling code from being spread in all intermediate stack frames.
+However, in :{rescala} it is not the caller of a function that expects a result, but rather the derived reactives.
+The notion of the call stack is not natural for the :{flowgraph} and when used would lead to the transaction semantics of :{cvtr} being violated by an exception stopping the transaction without evaluating all derived reactives.
+To solve this issue :{rescala} internally treats exceptions as values that are propagated in the :{flowgraph} similar to any other value.
+We refer to such values as errors to disambiguate from the built-in exception mechanism.
+To support error handling, only the operators that define the internal semantics for reactives have to be individually adapted to define the operators’ semantics when an input has an error value.
+Most existing operators forward any error in their inputs.
+In addition, the API makes errors available in user-defined functions using the normal language features (of Scala) and by providing several operators specifically for error handling.
+Treating errors as other values means that our core calculus :{fr} does not have to change to support errors – most importantly all properties still apply.
+
+
+# Internal Representation of Errors
+label = sec:implementation-errors
+
+The error propagation mechanism is integrated into :{rescala}.
+We have discussed the implementation of operators in :ref{Section; section-project-operators}.
+Each operator has an internal value type – which for events and signals is a :code{Pulse[T]}, where :code{T} is the type visible to developers.
+The :code{Pulse} trait distinguishes between :code{Value[T]} and :code{NoChange}.
+To support error propagation, we introduce a third alternative, :code{Exceptional}, and update the case distinctions for all operators.
+The updated implementation wraps any exception that is not caught in user-defined functions into the :code{Exceptional} type and propagates that in the same way as other values.
+However, accessing the value of a signal or event with an error causes the error to be thrown (usually to be handled by a user-defined function).
+Overall, because the propagation of errors reuses most of the work done for the propagation of normal values, our implementation strategy for errors induces
+no performance overhead when no faults are present,
+as discussed in :ref{Section; section-performance-error_propagation}.
+
+
+::figure{label=fig-shared_calendar-code-errors}
+  ``{label=line-background-shared_calendar-code-errors}
+    val selectedEntries = Signal {  :§selected-entries-signal-expression§
+      entrySet.value.toSet.filter { entry =>  :§selected-entries-filter-entrySet§
+        try selectedWeek.value == Week.of(entry.date.value)   :§signal-expression-apply§
+        catch { case DisconnectedSignal => false }  :§faults:access-try-catch§
+      }
+    } :§selected-entries-signal-expression-end§
+
+    selectedEntries.observe(  :§observer-signal§
+      onValue = Ui.displayEntryList,
+      onError = Ui.displayError)  :§observer-signal-onerror§
+  ``
+
+  Excerpt of the updated source code for the shared calendar application.
+::
+
+# A Shared Calendar with Errors
+
+:ref{Figure; fig-shared_calendar-code-errors} shows an excerpt of the shared calendar application with error handling.
+The signal expression for :code{selectedEntries} (:ref{Line; line-background-shared_calendar-code-errors; line=selected-entries-signal-expression}) uses Scala’s built-in filter function on sets to select only calendar entries of the current week.
+The date of each calendar entry is a signal, thus the signal expression accesses many nested signals (:ref{Line; line-background-shared_calendar-code-errors; line=signal-expression-apply}).
+The set of entries is a replicated reactive, thus the entries themselves – including the nested signals – are replicated on the network.
+For this example we assume that, depending on the network model and protocol, the transfer of a single entry may fail or be delayed.
+While this is normally not possible because of causal consistency in :{cvtr} if the entries are accessed from a different service – such as an existing calendar server – such failures and delays are common.
+
+In the case where the nested entry signal is not yet replicated accessing the :code{entry.date.value} causes an error, which is thrown as an exception.
+We handle the error using the standard Scala exception handling mechanisms.
+In this case, we handle the error right where it occurs by excluding the entry from the filter, thus not displaying it to the user.
+However, not all exceptional circumstances can be handled right where they occur.
+To address this, signals and events in REScala propagate all errors along the :{flowgraph}.
+When errors are propagated they may be handled by any signal expression accessing an input propagating the exception or by the :code{.recover} method that replaces errors with normal values.
+All errors in the :{flowgraph} must be handled.
+The latest place to handle an error is as part of an observer (:ref{Line; line-background-shared_calendar-code-errors; line=signal-expression-apply}).
+Otherwise, when an exception is observed but not handled, then the transaction aborts and the exception is thrown to the location where the transaction was created.
+
+
+# Error-aware Reactives
+
+The new error-aware semantics of reactives is a superset of their original semantics, thus existing code carries over unchanged.
+We extend the API of :{rescala} to enable integrations with errors from external APIs and to allow developers to customize how errors are processed.
+In particular, we provide an integration that allows imperative code to push errors into the :{flowgraph}, we add new operators that allow to recover errors into values, we extend observers to handle errors differently, we enable user-defined functions to handle errors using the normal language features, and we extend fold reactives such that they may recover from errors that have become part of their state.
+
+
+## Injecting Errors Into the :{FlowGraph}
+label = sec:extensions-input-api
+
+We extend the API of :code{Evt} and :code{Var} with methods to fire errors.
+:code{Evt.admit(error)} and :code{Var.admit(error)} behaves similar to their value propagating counterparts,
+but start the propagation with an error instead of a value.
+The main use of this API is to support the integration of existing frameworks,
+e.g., converting an exception of a networking library to an error in the :{flowgraph}.
+Consider an existing networking library with a callback-based API.
+When a timeout occurs in the network, the imperative library callback is converted into a reactive propagation:
+
+``
+  val fromNetwork = Evt[NetworkMessages]()
+  Network.onTimeout { error => fromNetwork.admit(error) }
+``
+
+
+
+
+## Observe and Recover
+label = sec:extensions-output
+
+We extend the observer's API to accept an additional handler parameter called :code{onError},
+which is used to observe propagated errors.
+This handler has the same purpose as :code{catch} blocks,
+and, similar to the standard :code{observe} call,
+has the goal of producing a side effect, e.g., displaying an error message.
+The error handler on observers can be missing: any unhandled error terminates the program
+in the same way as traditional uncaught exceptions.
+In the calendar example in Figure :ref{fig-shared_calendar-code}, any error is displayed to the user by the error
+handler defined on the signal in :ref{Line; line-background-shared_calendar-code-errors; line=observer-signal}
+using the extended observer API:
+
+``
+  selectedEntries.observe(
+    onValue = Ui.displayEntryList,
+    onError = Ui.displayError)
+``
+
+
+Instead of simply observing errors,
+the application developer can recover from the error inside the :{flowgraph} using
+the :code{recover} operator for signals and events, which is parameterized with
+a recovery function that converts an error to a normal value.
+
+``
+  val input: Signal[String] = ...
+  val recovered: Signal[String] = input.recover{ error => error.toString }
+``
+
+In the example, the :code{input} signal may contain an error instead of a string, but the :code{recovered} signal converts all errors into string values.
+The value is then propagated as the output of the :code{recover} operator.
+Any normal value that flows through the :code{recover} operator in the :{flowgraph} is propagated without change.
+The :code{recover} operator handles errors
+while they are propagated through the :{flowgraph} and before they reach an observer.
+Recovering from an error is most useful, when errors can be locally converted back into normal values.
+This case is relevant in several applications.
+For example, values can have local fallbacks, such as an unavailable location service
+that can be replaced by using more expensive or inaccurate local data.
+Another example is a signal holding a UI widget,
+where an error can be handled by displaying it to the user.
+
+## User-defined Computations
+label = sec:extensions-user-defined-computations
+
+A user-defined computation such as those in a signal expression may access any number of dependencies.
+When any of the dependencies propagates an error,
+the error is raised as a Scala exception by the :code{.value} call performing the access.
+The exception may be handled by the application using the default Scala exception handling mechanisms.
+Unhandled exceptions in a user-defined computation are propagated along the :{flowgraph}.
+
+The use of Scala exceptions enables our error handling scheme to integrate well with most libraries in the JVM.
+For example, the shared calendar in Figure :ref{fig-shared_calendar-code} filters the list of all calendar entries to only include entries of the current week in :ref{Line; line-background-shared_calendar-code-errors; line=selected-entries-signal-expression}.
+All entries containing an error are removed using a Scala :code{try/catch} block:
+
+
+``{label=listing-inline-error_expression}
+  val selectedEntries = Signal {
+    entrySet.value.filter { entry => :§filter§
+      try selectedWeek.value == Week.of(entry.date.value) :§date§
+      catch { case e: NetworkError => false } :§catch§
+    }
+  }
+``
+
+When the :code{entry.date} (:ref{Line; listing-inline-error_expression; line=date}) contains an error,
+the error is thrown as a Scala exception and handled in the :code{catch} by returning false (:ref{Line; listing-inline-error_expression; line=catch}),
+causing the filter to drop the entry (:ref{Line; listing-inline-error_expression; line=filter}).
+
+:% ## Change Events
+
+:% The :code{change} operator converts signals to events that fires every time the signal changes.
+:% The event includes both the value from and to which the
+:% input signal has changed.
+:% We modify the result type of the :code{change} operation to also represent changes to and from errors
+:% in addition to changes between values.
+:% Only when an old or new value containing an error is accessed, will the contained error be thrown as an exception.
+:% This gives the user full control to handle the error if needed,
+:% but it also aligns with the default semantics if the user does not handle the exception. For instance,
+:% if a value representing an error is accessed (same as reading an input reactive containing an error),
+:% then the error is propagated by the accessing reactive.
+:% If the error value is never accessed, then it is also not propagated,
+:% allowing for recovery in cases the reactive with the error is not required for the result of the computation.
+
+## Folds
+label = sec:error-propagation:conversions
+
+Recall that the :code{fold} operation supports converting events into signals.
+Given an event :code{e}, an initial value :code{init} and a function :code{f}, which are passed to it as parameters,
+ :code{fold} returns a signal that is initialized with :code{init} und gets
+updated every time :code{e} fires by applying :code{f} to the current
+value of the signal.
+Thus, unlike other derived reactives, a :code{fold} signal accesses its own current value,
+i.e., the fold (indirectly) depends on the complete history of the input event.
+For example, the signal :code{allEntries} collects all new entries into a set.
+
+``
+  allEntries.fold(Set.empty) { (entries, entry) => entries + entry}
+``
+
+The current state of the fold (:code{entries}) is treated like any ordinary dependency.
+If it is accessed and it holds an error, the error is thrown as a Scala exception.
+If the exception is not handled inside the user-defined computation (i.e., the function body of :code{fold}),
+then an error is propagated by the :code{fold} reactive to other
+reactives that depend on it.
+Alternatively, by handling the exception
+a developer can resume the computation of the :code{fold} reactive
+after an error.
+We present an example for fold with custom error handling next.
+
+We illustrate custom error handling using fold with the implementation of the :code{count} operator.
+
+``{label=line:error-example:}
+  def count() = fold(0) { (counter, occurrence) =>  :§init§
+    occurrence // access the (unused) value to propagate errors  :§access-occurrence§
+    try counter + 1 // increase count in non-error case  :§access-accumulator§
+    // continue counting after errors
+    catch { case (value, error) => value + 1 } :§catch§
+  }
+``
+
+The operator counts the number of non-error event occurrences.
+The :code{count} signal starts with its initial state initialized to zero (:ref{Line; line:error-example:; line=init}).
+The folding function takes the current :code{counter} of the fold and the incoming
+event, called :code{occurrence}, as
+parameters. When :code{occurrence} is accessed
+in :ref{Line; line:error-example:; line=access-occurrence}, there are two possibilities:
+the access raises an error or returns a normal value.
+
+In the case of an error an exception is thrown that aborts the execution of the user-defined computation.
+The exception is caught by the fold operator internally, stored for future processing, and propagated in the :{flowgraph}.
+
+If the access of :code{occurrence} returns a normal value processing continues (the value is ignored, because we are only interested in the number of occurrences and not in their values).
+Next, :code{counter} is accessed in
+:ref{Line; line:error-example:; line=access-accumulator}.
+If the current :code{counter} is a normal value, it is incremented, and the increased count
+is returned (:ref{Line; line:error-example:; line=access-accumulator}).
+
+If any prior evaluation of the fold results in an error, then accessing the :code{counter} throws that error as an exception.
+The exception is immediately caught by the user-defined function in :ref{Line; line:error-example:; line=catch}.
+The pattern matching in the :code{catch} block binds
+the last non-error value stored in the fold and the current error.
+Our example handler ignores the error and continues by incrementing the last non-error
+state, thus implementing a counter that resumes counting
+when a new occurrence arrives after an error.
+
+
+# Errors and Aborting Transactions
+
+The default schedulers in :{rescala} (see :ref{Section; section-implementation-schedulers}) support aborting transactions.
+A transaction is aborted when errors are observed but not handled or when the developer explicitly uses the abort operator.
+In both cases, the encountered error is then thrown as an exception in the context of the call that created the transaction.
+The exception thrown by aborted transactions includes the information about the where the error originated and which observers did not handle the error.
+This information allows to reconstruct the path of the error through the :{flowgraph}.
+
+The abort operator is useful for :{flowgraph}s, which are unable to handle errors or were designed without error handling in mind.
+The abort operator mirrors any value of the input reactive, but if the input reactive propagates an error then the transaction is guaranteed to abort.
+Thus, the :code{derived} signal in the following example can safely be used by code that is not aware of errors.
+
+``
+  val input: Signal[A] = ...
+  val derived: Signal[A] = input.abortOnError()
+``
+
+In addition to explicitly using the abort operator we also abort transactions when an error reaches an observer that has no error handler.
+This aborting by default behavior enables existing code that does not specify error handlers to be used without changes.
+The code that does not deal with errors is still semantically broken if an error occurs, but aborting the transaction and providing error output improves the development experience compared to simply ignoring the existence of exceptions in the host language.
+
+
+
+
+
+
+::figure{label=fig:running-ignore-faults}
+  ``highlight{label=listing-music-ignore_error}
+    val changeTrack: Evt[Track] = Evt[Track]() :§change-track-event§
+    val currentTrack: Signal[Track] = changeTrack.latest() :§initial-state§
+    val currentScreen = composeInfoScreen(currentTrack) :§call-compose§
+
+    currentTrack.observe(playMusic) :§first-observe§
+    currentScreen.observe(displayScreen) :§last-observe§
+
+    def composeInfoScreen(track: Signal[Track]): Signal[Screen] = { :§composing-function§
+      val metadata = track.map(loadMetadata) :§map-user§
+      val infoScreen = Signal {:§signal-expression§
+        renderInfoScreen(track.value, metadata.value)
+      }
+      infoScreen
+    }
+
+    def loadMetadata(t: Track): Data = {
+      :hl§{... fetch data, assume no faults occur ...}§ :§access-unreliable-resource§
+    }
+
+    def renderInfoScreen(t: Track, md: Data): Screen
+    def playMusic(t: Track): Music
+    def displayScreen(s: Screen): Unit
+  ``
+  :image{/Figures/Graphs/music-app-example.pdf}
+
+  Music application without fault handling.
+::
+
+# Alternatives for Error Handling in Dataflow Languages
+
+To discuss alternatives for error handling, we use the code example shown in :ref{Figure; fig:running-ignore-faults}.
+The example represents the concept of a music player application that shows information about the currently playing track.
+The figure includes a visualization of the :{flowgraph} and the focus of our analysis will be the :code{composeInfoScreen} function, which creates two reactives.
+Important for error handling is that the metadata about the track is fetched from some resource that could potentially fail (:ref{Line; listing-music-ignore_error; line=map-user}).
+The code currently assumes that no failure occurs.
+The metadata is then passed through the application (:ref{Line; listing-music-ignore_error; line=signal-expression}) until it is finally observed (:ref{Line; listing-music-ignore_error; line=last-observe}).
+There are different strategies to handle this failure which we discuss next.
+
+::figure{label=fig:manual-exception-wanted-faults}
+  ``highlight{label=line:wanted-}
+    val changeTrack: Evt[Track] = Evt[Track]()
+    val currentTrack: Signal[Track] = changeTrack.latest()
+    val currentScreen = composeInfoScreen(currentTrack)
+
+    currentTrack.observe(playMusic)
+    :hl§{try \{}§ currentScreen.observe(displayScreen) :hl§{\}}§
+    :hl§{catch \{}§
+      :hl§{case SomeException => displayScreen(errorScreen)}§ :§display-error§
+    :hl§{\}}§
+
+    def composeInfoScreen(track: Signal[Track]): Signal[Screen] = {
+      val metadata = track.map(loadMetadata)
+      val infoScreen = Signal {
+        renderInfoScreen(track.value, metadata.value)
+      }
+      infoScreen
+    }
+
+    def loadMetadata(t: Track): Data = {
+      ... :hl§{throw SomeException}§ ... :§throw§
+    }
+
+    def renderInfoScreen(t: Track, md: Data): Screen
+    def playMusic(t: Track): Music
+    def displayScreen(s: Screen): Unit
+  ``
+  Incorrect example: Exception not thrown in scope of handler.
+::
+
+
+::figure{label=fig:manual-exception-faults}
+  ``highlight{label=line:manual-}
+    val changeTrack: Evt[Track] = Evt[Track]()
+    val currentTrack: Signal[Track] = changeTrack.latest()
+    val currentScreen = composeInfoScreen(currentTrack)
+
+    currentTrack.observe(playMusic)
+    currentScreen.observe(displayScreen)
+
+    :hl§{try}§ {
+      changeTrack.fire(beethoven) :§set§
+    :hl§{\} catch \{}§
+      :hl§{case SomeException =>}§
+        :hl§{// the code here should not have to know}§
+        :hl§{// about loadMetadata}§
+    }
+
+    def composeInfoScreen(track: Signal[Track]): Signal[Screen] = {
+      val metadata = :hl§{try}§ {
+          track.map(loadMetadata) :§map§
+        :hl§{\} catch \{}§
+          :hl§{case SomeException =>}§
+            :hl§{// cannot handle here}§
+        }
+      val infoScreen = Signal {
+        renderInfoScreen(track.value, metadata.value)
+      }
+      infoScreen
+    }
+
+    def loadMetadata(t: Track): Data = {
+      ... :hl§{throw SomeException}§ ...
+    }
+
+    def renderInfoScreen(t: Track, md: Data): Screen
+    def playMusic(t: Track): Music
+    def displayScreen(s: Screen): Unit
+  ``
+  Handlers not at the correct position to handle error
+::
+
+
+## Naive Exception Handling
+
+In Figure :ref{fig:manual-exception-wanted-faults} (an adapted version of Figure :ref{fig:running-ignore-faults})
+we assume that :code{loadMetadata} fails
+and throws some exception as suggested in :ref{Line; line:wanted-; line=throw}.
+In that case, we want to display an error message instead of displaying the status information,
+but if we try to catch the error as suggested in :ref{Line; line:wanted-; line=display-error} it will not work as desired.
+The exception is propagated up the stack, but the throw statement  is not executed in the scope of the handler.
+
+Figure :ref{fig:manual-exception-faults} shows the two scopes where the :code{loadMetadata} function is executed thus these are the scopes where exception could be caught.
+First, when the metadata signal is created in :ref{Line; line:manual-; line=map} and, second, every time the track is changed
+by an imperative call to :code{changeTrack.fire} in :ref{Line; line:manual-; line=set}.
+None of the two call sites, however, allow to notify the user about the error.
+The first call site when the reactive is created is concerned with the :{flowgraph} and not yet able to reason about values in the graph that will only be used later.
+The second call site when the source is changed is able to reason about which operation has failed (changing tracks) but it is not known why the failure happened or how to handle it.
+
+Instead, the error should be handled as part of the info screen.
+The screen should show the user of the application why the metadata of the track could not be loaded.
+This is only possible by propagating the error in the :{flowgraph}.
+
+
+
+
+::figure{label=fig:mondaic-faults}
+  ``highlight{label=line:monadic-}
+    val changeTrack: Evt[Track] = Evt[Track]()
+    val currentTrack: Signal[Track] = changeTrack.latest()
+    val currentScreen = composeInfoScreen(currentTrack)
+
+    currentTrack.observe(playMusic)
+    currentScreen.observe {:§good-observe§
+        :hl§{case Success(screen) =>}§ displayScreen(screen)
+        :hl§{case Failure(e) =>}§ :hl§{displayScreen(makeErrorScreen(e))}§
+      }
+
+    def composeInfoScreen(track: Signal[Track]): Signal[:hl§{Try[Screen]}§] = {
+      val metadata = track.map(loadMetadata)
+      val infoScreen = Signal {
+        metadata.value :hl§{match \{}§:§sprinkled-error-handling§
+          :hl§{case Successful(unwrappedData) =>}§
+            renderInfoScreen(track.value, :hl§{unwrappedData}§)
+          :hl§{case Failure(e) => Failure(e)}§
+        }
+      }
+      infoScreen
+    }
+
+    def loadMetadata(t: Track): :hl§{Try[Data]}§ = :§return-type§
+      :hl§{Try}§ {
+        ... throw SomeException ...
+      }
+
+    def renderInfoScreen(t: Track, md: Data): Screen
+    def playMusic(t: Track): Music
+    def displayScreen(s: Screen): Unit
+  ``
+  Errors as values.
+::
+
+## Monadic Approach: Encoding Errors as Values
+label = section-errors-monadic
+
+Functional languages often provide mechanisms to encode errors as part of the return value:cite{; Wadler1995}.
+Developers can use this approach with :{rescala} without changes.
+In the example, we can implement this behavior by encoding the error as part of the return value of :code{loadMetadata}.
+The result is wrapped in a :code{Try[Screen]} in :ref{Line; line:monadic-; line=return-type} of Figure :ref{fig:mondaic-faults},
+the :code{Try} is a value that can either represent the correct result, or contain an error.
+The encoding in Figure :ref{fig:mondaic-faults} provides the desired semantics,
+as shown in :ref{Line; line:monadic-; line=good-observe},
+but requires all parts of the program which depend on the track data to be rewritten to propagate or handle the error,
+as in :ref{Line; line:monadic-; line=sprinkled-error-handling}.
+Mixing error handling code into the normal control flow hides the main logic and makes the code harder to :cite{understand; Buhr2000},
+and – especially when definitions of reactives are concise – unwrapping values twice is impractical.
+For example, compare the original expression and the one with manual error handling (using typical syntactic sugar):
+
+``
+  Signal {
+    renderInfoScreen(track.value, metadata.value)
+  }
+
+  Signal {
+    metadata.value.map {unwrappedData =>
+      renderInfoScreen(track.value, unwrappedData)
+    }
+  }
+
+``
+
+
+
+::figure{label=fig:language-faults}
+  ``{label=line:language-}
+    val changeTrack: Evt[Track] = Evt[Track]()
+    val currentTrack: Signal[Track] = changeTrack.latest() :§fold-signal§
+    val currentScreen = composeInfoScreen(currentTrack)
+
+    currentTrack.observe(playMusic)
+    currentScreen.recover(makeErrorPage)} :§recover§
+      .observe(displayScreen)
+
+    def composeInfoScreen(track: Signal[Track]): Signal[Screen] = {
+      val metadata = track.map(loadMetadata) :§map-base-signal§
+      val infoScreen = Signal { :§derived-signal§
+        renderInfoScreen(track.value, metadata.value)
+      }
+      infoScreen
+    }
+
+    def loadMetadata(t: Track): Data = { :§line:faul-propagation:load-metadata-throwing-exception§
+      ... throw SomeException ... :§thrown§
+    }
+
+    def renderInfoScreen(t: Track, md: Data): Screen
+    def playMusic(t: Track): Music
+    def displayScreen(s: Screen): Unit
+  ``
+  Example reactive program with error handling.
+::
+
+
+## Errors in the :{FlowGraph}
+
+The example from Figure :ref{fig:running-ignore-faults} implemented with our solution
+is shown in Figure :ref{fig:language-faults}.
+The fault in the :code{loadMetadata} function triggers an exception in :ref{Line; line:language-; line=thrown}.
+In our example, the error could be handled as soon as at
+the :code{metadata} signal in :ref{Line; line:language-; line=map-base-signal}, but it is not.
+When an error is not explicitly handled by a reactive, it is propagated further to the next reactive in the graph and can then be handled at any point, at the latest at an observer before it gets exposed outside the :{flowgraph}.
+In Figure :ref{fig:language-faults}, the error is handled  at the :code{currentScreen} signal, before the value of the signal is observed by the :code{makeErrorPage} function (:ref{Line; line:language-; line=recover}).
+
+
+
+# Multichannel Propagation
+label = section-errors-multichannel
+
+Errors propagation can be seen as a second channel of information using the normal :{flowgraph}.
+We can extend the concept of additional propagation channels to include more values modeling typical challenges in distributed systems, such as missing or late values.
+
+Missing values occur when a part of the distributed application is started, but not yet connected
+and there is no useful initial value for created signals.
+Events have no initial state, so missing values do not apply to events.
+Missing values are similar to exceptional values,
+i.e., a signal which depends on an empty signal is itself empty.
+Missing values are otherwise ignored by observers and conversions to events;
+only directly reading the value of an empty signal with an imperative call will result in that call to fail with a normal Scala :code{NoSuchElementException}.
+
+Late values frequently happen in systems that make a dynamic trade-off between reliability and performance by using cached values.
+For example, to get correct results from a replicated database it is a common strategy to query multiple replicas.
+The value returned by the majority of the replicas is considered the correct result.
+However, to get the correct result the application needs to wait for all replicas,
+which can result in latency problems if one of the replicas is slow.
+As :cite{style=name; Guerraoui2016} observe, it is often useful to already start speculative execution from the first result,
+as that result is likely to be correct, and we do not have to wait for slow replicas.
+Speculative execution can be handled transparently.
+When a not yet confirmed value arrives it is propagated similarly to a normal value, but new changes remain hidden to the external program.
+As soon as the value is confirmed it will be compared to the speculative value,
+if they are equal, any evaluations of signals can be skipped and only observers must be executed to finish the propagation.
+If the fixed value differs from the speculative execution, then a new update is started as usual,
+and the speculative results are dropped.
+
+We believe that the full potential for integrating external concepts into the :{flowgraph} has not yet been realized.
+The inclusion of missing and speculative values already provides more special cases in addition to error propagation, but it remains future research to fully understand how these concepts generalize.
+
+
+# Conclusion
+
+Displaying an exception to a user is often a good strategy for temporary or spurious errors such as network connectivity problems, allowing the user to take action if desired (e.g., fixing internet connectivity).
+In addition, observers are used to extend the behavior and invariants from the :{flowgraph} to external imperative libraries and errors/exceptions should be part of this interface.
+While not all languages have exception mechanisms, we believe that any embedding of :{cvtr} into a language should follow the conventions of the host language to provide a consistent development experience.
+In addition, extending the propagation of values to include metadata about the validity of the value seems to be a generally useful extension to :{cvtr} that has uses beyond simple error cases.
+Our evaluation (:ref{Section; section-performance-error_propagation}) shows that the overhead to support such additional data during propagation is negligible and the only cost are the added memory requirements to store the additional data.
+

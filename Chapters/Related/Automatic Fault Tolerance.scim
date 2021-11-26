@@ -1,0 +1,62 @@
+# Automatic Fault Tolerance for Clouds and Clusters
+label = section-related_work-automatic_fault_tolerance_clusters
+
+Clusters of devices – such as The Cloud – usually have fast and reliable data storage and many more devices than are required for each individual task, but very unpredictable workloads of tasks.
+Each task typically spans many devices and may run for long periods of time.
+Because tasks have different priority it is often desirable to stop – or scale down – less important tasks as soon as utilization of the cluster is high.
+This – in addition to the use of commodity devices that are individually not very reliable – results in the typical computing environment where tasks (i.e., applications) must be able to tolerate partial “crashes” of some or most devices and still be able to continue the task or at least resume it later.
+This environment has produced a series of fault-tolerant programming paradigms.
+
+## MapReduce
+
+:cite{MapReduce; Dean2008,Laemmel2008} tackles the reliability problem in data centers by simplifying and restricting
+the programming model down to just two operations – map and reduce.
+Or more precisely a map and reduce on keyed subsets of data.
+MapReduce enables parallel execution of tasks on multiple devices.
+Failure recovery is automated with a central coordinator
+responsible for rescheduling operations of failed devices.
+The coordinator is often implemented as a distributed consensus that ensures reliability at negligible cost, because of fast networks and the possibility to assign reliable coordinator devices.
+
+MapReduce excels in automation and fault tolerance,
+but lacks high-level programming abstractions.
+This has fostered research on adding abstractions on top of MapReduce.
+:cite{Dryad; Isard2009}, :cite{PigLatin; Olston2008}, and :cite{FlumeJava; Chambers2010} all provide such new abstractions on top of MapReduce.
+However, these solutions still only support the same data-parallel type of computations also supported by MapReduce.
+These systems abstract away the distribution – this makes them
+unsuited beyond mostly reliable clusters,
+where failed devices can always be replaced.
+
+Formal methods have been used for parts of data center computations.
+Cloud :cite{Calculus; Jarraya2012} accounts for security regarding firewall configurations,
+and :cite{style=name; Laemmel2008} studied MapReduce as a functional programming paradigm.
+
+
+## Generalized Batch and Stream Processing Paradigms
+
+Frameworks for general batch and stream processing of data, such as
+:cite{Spark; Zaharia2012} and :cite{Flink; Alexandrov2014TheSP},
+handle crashes of worker machines to minimize
+lost work when machines fail.
+They have syntax inspired by functional reactive programming that uses operators to build a dataflow graph.
+Because they execute in cluster environments with full control of communication and distribution of work among machines,
+Spark and Flink can offer abstractions for distribution and fault tolerance with automatic correctness :cite{guarantees; Carbone2015LAS}.
+To provide these guarantees, applications are written in domain specific languages, but, in contrast to :{cvtr}, the execution runtime is not connected to the embedding application.
+This solution is well-suited for data parallel applications, where
+computations are broken down into independent tasks.
+It is, however, unsuitable for the interactivity and collaboration requirements of :{apps} and also unsuitable for other kinds of distributed environments without fast network and replaceable devices.
+Restarting parts of the application on a different machine is not an option for :{apps} – the email client of a user cannot simply be restarted on another user’s device.
+
+
+:cite{MBrace; Dzik2013} extends F# with expressions for cloud computations.
+The use of immutable global references
+allows the distributed runtime to automatically re-execute tasks on failed devices without causing inconsistencies.
+Errors that are raised during the evaluation of cloud expressions
+are transparently propagated along the dataflow path of the expression.
+In contrast to :{cvtr}, the propagation of values extends across the distribution boundaries, thus allowing non-localized error handling.
+However, since the distributed state is immutable, the abstractions are not well suited to interactive or collaborative applications.
+
+
+:cite{style=name; Viering2018} develop a typing discipline for a core model that captures the above approaches to ensure correct execution of such systems in the presence of faults.
+This static approach explicitly assumes the existence of central coordination and replacements for failed devices, singling them out as the central solutions for automatic fault tolerance in a cluster environment.
+We generally have neither coordination nor replacements available for :{apps}.
+

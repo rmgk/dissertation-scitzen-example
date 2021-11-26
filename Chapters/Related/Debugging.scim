@@ -1,0 +1,51 @@
+# Debugging and Tuning Approaches
+label = section-tuning-related
+
+We discussed our extensions for live tuning and debugging in :ref{Chapter; chapter-live_tuning}.
+Other debugging approaches more fitting to different high-level approaches have been proposed.
+In object-centric :cite{debugging; Ressia12, Corrodi16},
+breakpoints are set on access or change of a specific objects fields,
+not only on all instances of a certain class,
+similar to how Reactive Inspector sets breakpoints on specific reactives in the :{flowgraph}.
+
+Programming paradigms with lazy evaluation also have non-sequential execution order, which cause similar problems for debugging.
+Addressing non-sequential evaluation led to specialized debugging techniques such as oracle :cite{debugging; Brassel07},
+where the user interacts with the debugger in a dialog style using questions and answers.
+Another approach is to record evaluations in a lazy program
+and then use a strict debugger to inspect the :cite{records; Brassel09, Ennals03},
+similar to our use of the chrome debugger for sequential code in the :{flowgraph}.
+
+A common feature of advanced debugging is to the ability to record the execution
+and inspect the log afterwards.
+:cite{Clematis; AlimadadiS0P16} is such a tool to record all input events
+(user actions, incoming server messages, timeouts) and outputs (DOM changes, network request) in a web application.
+:cite{Sahand; Alimadadi0P16} is an extension to Clematis and additionally records all server inputs
+(incoming client messages, etc.).
+These events are correlated and visualized as stories
+– a graphical representation of the execution not unlike our :{flowgraph}.
+However, these stories are sequential in nature and thus not as easy to follow as the :{flowgraph},
+and also do not lend themselves to modifications.
+:cite{Barr et al.; BarrM14, BarrMMMS16} record execution logs of imperative applications.
+They use those logs to enable forward and backward navigation in a visualizing debugger similar to our history navigation.
+By taking advantage of information in the garbage collector about the running program,
+they reduce the amount of memory needed to record.
+However, in contrast to the :{flowgraph}, the state of the imperative application cannot be changed after recording,
+prohibiting modifications.
+Rxfiddle :cite{Banken:2018:DDF:3180155.3180156} allows one to visualize
+the marble diagram and the dataflow of a reactive application.
+They have not considered modifications.
+
+There are some tools that support live modifications of applications:
+The :cite{Elm debugger; ElmDebugger} allows one to go back in the past,
+but modifications have to be done on the source code.
+:cite{Kato2016; style=name} have presented the idea of live tuning,
+where users are presented with a simplified interface
+– only the tuning sliders – of a full-fledged live programming IDE.
+We use this idea to provide live tuning based on an extended debugger instead of a full IDE.
+:cite{ZenSheet; Alda2017} pushes spreadsheets towards general purpose programming,
+whereas the reactive part of :{cvtr} can be described as spreadsheet semantics for general purpose programming languages.
+Our approach has the advantage that existing tools, libraries, and infrastructure can be reused,
+however at the cost of less flexible changes possible at runtime.
+We believe that both approaches provide their own value,
+and it will be interesting to see how far research on each approach can push the boundaries in the corresponding directions.
+

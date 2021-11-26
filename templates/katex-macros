@@ -1,0 +1,90 @@
+\instore:\left<#2\right>#1
+\ndevice:#1\instore{#3}{#2}
+\prop:\left(#1; #2\right)
+\tprop:\triangleright \prop{#1}{#2}
+\devprop:\ndevice{#1}{#2}{#3} \triangleright \prop{#4}{#5}
+
+\locationp:\mathit{location}(#1)
+\makeloc:#1 = \locationp{#2}
+\extsourcesp:\mathit{sources}(#1)
+\extobservep:\mathit{observe}(#1)
+\sigact:\mathit{true}
+
+\readyp:\mathit{ready}(#1,#2)
+\ready:#3 \in \readyp{#1}{#2}
+\nready:#3 \not\in \mathit{ready}(#1,#2)
+
+\outdatedp:\mathit{outdated}(#1)
+\outdated:#2 \in \outdatedp{#1}
+\noutdated:#2 \not\in \mathit{outdated}(#1)
+
+\reevexp:\mathit{eval}(#1)
+\filterexp:\mathit{filter}(#1)
+\stateful:\mathit{stateful}(#1)
+
+\mmerge:\mathit{merge}
+\massign:\mathit{update}(#1,#2,#3)
+
+\inputs:\mathit{inputs}(#1)
+\dom:\mathit{dom}(#1)
+\dynamic:\operatorname{dynamic}(#1)
+\complete:\mathit{complete}(#1)
+
+
+\inp:\mathit{in}
+\obs:\mathit{obs}
+\rst:\mathit{rst}
+\act:\mathit{act}
+\vala:\mathit{val}
+\op:\mathit{op}
+
+\type:\operatorname{#1}
+
+
+\fun:#1 \mathrel{=\!>} #2
+\evt:\operatorname{Source}(#1)
+\react:#1.\operatorname{Map}\{#2\}
+\flatten:#1.\operatorname{Flatten}
+\newcommand{\unit}{\operatorname{unit}}
+\newcommand{\error}{\operatorname{error}}
+\handle:\operatorname{try} #1 \operatorname{catch} #2
+\named:\ \ \text{(\textsc{#1})}\and
+\ror:(#1 || #2)
+\observe:#1.\operatorname{observe}(#2)
+\filter:#1.\operatorname{Filter}\{#2\}
+\snapshot:#1.\operatorname{Snapshot}(#2)
+\newcommand{\foldn}{\operatorname{Fold}}
+\fold:#1.\foldn{}(#2)\{#3\}
+\access:#1.\operatorname{\!value}
+\fire:#1.\operatorname{\!fire}(#2)
+
+
+
+\trigger:A\llbracket#1\rrbracket
+\compile:C\llbracket#1\rrbracket
+\vx:\operatorname{val}\ x_0 =
+\ccond:\operatorname{if}\ (#1)\{#2\}
+\celse:\operatorname{else}\ #1
+
+
+
+
+\rt:\ #1\triangleright #2
+\rp:\ifthenelse{\equal{#3}{}} {\instore{#1}{#2}} {\rt{\instore{#1}{#2}}{#3}}
+\crp:\rp{\ifthenelse{\equal{#1}{}}{t_l}{#1}}{#2}{#3}
+\device:\ifthenelse{\equal{#2}{}}{\Sigma}{#2}#1
+
+
+\trace:\mathit{trace}
+\ptrace:\mathit{ptrace}
+\txtrace:\mathit{transaction}
+\ctrace:\mathit{ctrace}
+\stp:\xrightarrow{#1}_p
+\causal:\mathit{cause}(#1)
+
+
+\locm:r_\mathit{#1}
+\locn:[1]
+
+
+

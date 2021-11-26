@@ -1,0 +1,82 @@
+%% Creator: Inkscape inkscape 0.92.4, www.inkscape.org
+%% PDF/EPS/PS + LaTeX output extension by Johan Engelen, 2010
+%% Accompanies image file '../../Figures/Studies/app.pdf' (pdf, eps, ps)
+%%
+%% To include the image in your LaTeX document, write
+%%   \input{<filename>.pdf_tex}
+%%  instead of
+%%   \includegraphics{<filename>.pdf}
+%% To scale the image, write
+%%   \def\svgwidth{<desired width>}
+%%   \input{<filename>.pdf_tex}
+%%  instead of
+%%   \includegraphics[width=<desired width>]{<filename>.pdf}
+%%
+%% Images with a different path to the parent latex file can
+%% be accessed with the `import' package (which may need to be
+%% installed) using
+%%   \usepackage{import}
+%% in the preamble, and then including the image with
+%%   \import{<path to file>}{<filename>.pdf_tex}
+%% Alternatively, one can specify
+%%   \graphicspath{{<path to file>/}}
+%%
+%% For more information, please see info/svg-inkscape on CTAN:
+%%   http://tug.ctan.org/tex-archive/info/svg-inkscape
+%%
+\begingroup%
+  \makeatletter%
+  \providecommand\color[2][]{%
+    \errmessage{(Inkscape) Color is used for the text in Inkscape, but the package 'color.sty' is not loaded}%
+    \renewcommand\color[2][]{}%
+  }%
+  \providecommand\transparent[1]{%
+    \errmessage{(Inkscape) Transparency is used (non-zero) for the text in Inkscape, but the package 'transparent.sty' is not loaded}%
+    \renewcommand\transparent[1]{}%
+  }%
+  \providecommand\rotatebox[2]{#2}%
+  \newcommand*\fsize{\dimexpr\f@size pt\relax}%
+  \newcommand*\lineheight[1]{\fontsize{\fsize}{#1\fsize}\selectfont}%
+  \ifx\svgwidth\undefined%
+    \setlength{\unitlength}{315bp}%
+    \ifx\svgscale\undefined%
+      \relax%
+    \else%
+      \setlength{\unitlength}{\unitlength * \real{\svgscale}}%
+    \fi%
+  \else%
+    \setlength{\unitlength}{\svgwidth}%
+  \fi%
+  \global\let\svgwidth\undefined%
+  \global\let\svgscale\undefined%
+  \makeatother%
+  \begin{picture}(1,0.66428571)%
+    \lineheight{1}%
+    \setlength\tabcolsep{0pt}%
+    \put(0,0){\includegraphics[width=\unitlength,page=1]{../../../Figures/Studies/app.pdf}}%
+    \put(0.07142857,0.64285714){\color[rgb]{0,0,0}\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Citizen A\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=2]{../../../Figures/Studies/app.pdf}}%
+    \put(0.35714286,0.64285714){\color[rgb]{0,0,0}\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Citizen B\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=3]{../../../Figures/Studies/app.pdf}}%
+    \put(0.64285714,0.64285714){\color[rgb]{0,0,0}\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Street light\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=4]{../../../Figures/Studies/app.pdf}}%
+    \put(0.92857143,0.64285714){\color[rgb]{0,0,0}\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}City\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=5]{../../../Figures/Studies/app.pdf}}%
+    \put(0.74761905,0.56428571){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}News\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=6]{../../../Figures/Studies/app.pdf}}%
+    \put(0.30238095,0.49761905){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}Forward\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=7]{../../../Figures/Studies/app.pdf}}%
+    \put(0.42619048,0.39047619){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}Emergency\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=8]{../../../Figures/Studies/app.pdf}}%
+    \put(0.71428571,0.30952381){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}Disconnect\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=9]{../../../Figures/Studies/app.pdf}}%
+    \put(0.27857143,0.24285714){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}Emergency!\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=10]{../../../Figures/Studies/app.pdf}}%
+    \put(0.42142857,0.17619048){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}Emergency!\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=11]{../../../Figures/Studies/app.pdf}}%
+    \put(0.16428571,0.10952381){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}News A\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=12]{../../../Figures/Studies/app.pdf}}%
+    \put(0.16428571,0.04285714){\color[rgb]{0,0,0}\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}News B\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=13]{../../../Figures/Studies/app.pdf}}%
+  \end{picture}%
+\endgroup%

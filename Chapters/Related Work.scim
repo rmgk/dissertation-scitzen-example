@@ -1,0 +1,23 @@
+== Related Work
+label = chapter-related_work
+
+In this chapter we discuss related work that we either build upon or that provides an alternative to the solutions discussed in this thesis.
+To the best of our knowledge, there are no other solutions that cover the same design space as :{rescala} and :{cvtr}, but there are many solutions that have an overlap for partial aspects.
+
+First, we discuss various forms of reactive programming in :ref{Section; section-related-reactive_programmings} – which is where :{rescala} draws the most influences from.
+Then, in :ref{Section; section-related_work-actors}, we discuss actors as an alternative programming paradigm that has seen success for distributed applications.
+Likewise, we discuss cluster and cloud systems as a good example for the convenience achieved by automatic fault tolerance in :ref{Section; section-related_work-automatic_fault_tolerance_clusters}.
+
+Solutions that provide consistency through the use of specific data types are covered in :ref{Section; section-related_work-data_type_consistency}.
+:ref{Section; section-related_work-calculi} discusses formal approaches to distributed systems.
+Solutions that provide any form of collaboration framework with consistency guarantees for complete applications are discussed in :ref{Section; section-related_work-packaged_consistency}.
+Related work on debugging and tuning of applications is discussed in :ref{Section; section-tuning-related}.
+
+:include{/Chapters/Related/The Reactive Programmings.scim}
+:include{/Chapters/Related/Actors.scim}
+:include{/Chapters/Related/Automatic Fault Tolerance.scim}
+:include{/Chapters/Related/Convergent Replication.scim}
+:include{/Chapters/Related/Calculi and Analysis.scim}
+:include{/Chapters/Related/Complete Packages.scim}
+:include{/Chapters/Related/Debugging.scim}
+

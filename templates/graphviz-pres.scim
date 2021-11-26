@@ -1,0 +1,18 @@
+:{type; default=digraph} {
+  node [
+    fontname = "Libertinus Sans";
+    fontsize = 20;
+  ];
+  edge [
+    fontname = "Libertinus Sans";
+    fontsize = 20;
+  ];
+  graph [
+    fontname = "Libertinus Sans";
+    fontsize = 20;
+  ]
+
+:{template content}
+
+}
+

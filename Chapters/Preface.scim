@@ -1,0 +1,131 @@
+
+:raw{tex="
+\titlingpageend{\clearpage}{\clearpage}
+
+\begin{titlingpage}
+  \centering
+  \pdfbookmark[0]{Title Page}{title-page}
+
+  ~
+  \vfill
+  \LARGE
+  \thetitle
+
+  \vfill
+  \large
+  \textbf{vom Fachbereich Informatik}\\
+  \textbf{der Technischen Universität Darmstadt}
+
+  \vspace{1em}
+  zur Erlangung des akademischen Grades eines\\
+  Doktor-Ingenieurs (Dr.-Ing.) genehmigte
+
+  \vspace{1em}
+  \textbf{Dissertation von}\\
+  \textbf{\theauthor}
+
+  \vfill
+  \begin{tabular}{rcl}
+  \textit{Erstreferentin} && Prof. Dr. Mira Mezini \\
+  \\
+  \textit{Zweitreferent} && Prof. Dr. Volker Markl \\
+  \end{tabular}
+
+  \vfill
+  Darmstadt, 2021
+\end{titlingpage}
+"}
+
+``text
+  Ragnar Mogk:
+  A Programming Paradigm for Reliable Applications in a Decentralized Setting
+  Darmstadt, Technische Universität Darmstadt
+  Hochschulkennziffer: Darmstadt – D 17
+  Tag der Einreichung: 27.01.2021
+  Tag der mündlichen Prüfung: 10.03.2021
+  Jahr der Veröffentlichung auf TUprints: 2021
+  URN: urn:nbn:de:tuda-tuprints-194035
+
+  Veröffentlicht unter CC BY-SA 4.0 International
+``
+
+:raw{tex="\noindent{}"}:link{https://creativecommons.org/licenses/by-sa/4.0/}
+
+:% :break{}
+
+:raw{tex="\clearforchapter{}"}
+
+:break{}
+
+“Reliability can be purchased only at the price of simplicity” – :cite{style=name; DBLP:journals/cacm/Hoare69}.
+
+``text
+  Said in the context proofs of program correctness that solve real problems, but are difficult to give for programs with complex designs.
+``
+
+:break{}
+
+::
+  “What would you tell your grandmother when she asks what you study?“ – :cite{Sergio; DBLP:books/aw/AbiteboulHV95}
+
+  Programming languages were conceived to make it easier for humans to provide instructions to the machines.
+  In the early days, computers essentially executed a sequence of instructions changing some internal state to compute an output.
+  Machines were big and slow, and many of us shared a single machine.
+  Languages were designed to take advantage of those machines.
+  However, the machines have changed.
+  They are small and fast, and each of us has many machines, they outnumber us by a quickly increasing amount.
+  Programming languages have not changed.
+  We still talk to machines as if they were big and slow, this makes it hard for the machines to execute programs efficiently, and makes it hard for us to express what we want.
+  The world has changed.
+  Applications must – above all else – become reliable.
+  In this thesis, we study how to talk about applications that interact with humans, and how to do so in a way that is both good for machines and for people.
+::
+
+:break{}
+
+# Abstract
+
+The use of applications has changed together with the underlying computing platform.
+The modern computer is no longer a big piece of office equipment
+that is booted to execute a single task producing a single output.
+Instead, we have many interconnected devices – smartphones, laptops, routers, Internet of Things gadgets, and even some venerable desktop computers we still use to get that heavy work done.
+Furthermore, ubiquitous connectivity with the Internet, and thus collaboration with other people and their set of devices has drastically changed how people expect applications to work.
+
+For such distributed, interactive, and collaborative applications, we currently lack a declarative fault-tolerant programming paradigm with easy-to-reason high-level guarantees.
+We want to empower developers from organizations of all sizes to be able to create reliable applications that solve their users needs.
+Thus, the central question in this thesis is: How to automate fault tolerance for such applications?
+
+To answer this question, we present a novel approach to automatic fault tolerance using a high-level programming paradigm.
+Our goal is to provide future developers with a paradigm that reduces the challenge posed by failures in interactive applications similar to how a garbage collector reduces the challenge of managing memory.
+To do so, our programming paradigm abstracts from the notion of changes in data, thus removing the need to handle failure cases differently and providing developers a single set of properties to always rely on.
+
+# Zusammenfassung
+
+Die Nutzung von Anwendungen hat sich zusammen mit der zugrunde liegenden Computerplattform verändert.
+Der moderne Computer ist nicht länger ein großes Stück Büroausstattung
+das gestartet wird, um eine einzelne Aufgabe auszuführen und eine einzelne Ausgabe zu produzieren.
+Stattdessen haben wir viele miteinander verbundene Geräte – Smartphones, Laptops, Router, Internet-der-Dinge-Gadgets und sogar einige altgediente Desktop-Computer, die wir immer noch verwenden, um umfangreiche Arbeiten zu erledigen.
+Darüber hinaus hat die allgegenwärtige Konnektivität mit dem Internet und damit die Zusammenarbeit mit anderen Menschen und deren Geräten die Erwartungen an die Funktionsweise von Anwendungen drastisch erweitert.
+
+Für solche verteilten, interaktiven und kollaborativen Anwendungen fehlt uns derzeit ein deklaratives, fehlertolerantes Programmierparadigma mit einfach zu verstehenden Garantien.
+Wir wollen Entwicklern aus verschiedenen Organisationen die Möglichkeit geben, zuverlässige Anwendungen zu erstellen, die die Anforderungen ihrer Benutzer erfüllen.
+Die zentrale Frage in dieser Arbeit lautet daher: Wie kann man die Fehlertoleranz für solche Anwendungen automatisieren?
+
+Um diese Frage zu beantworten, präsentieren wir einen neuartigen Ansatz zur automatischen Fehlertoleranz unter Verwendung eines Programmierparadigmas.
+Unser Ziel ist es, zukünftigen Entwicklern ein Paradigma an die Hand zu geben, das die Herausforderung von Fehlern in interaktiven Anwendungen reduziert, ähnlich wie ein Garbage Collector die Herausforderung der Speicherverwaltung reduziert.
+Um dies zu erreichen, abstrahiert unser Programmierparadigma wie sich Daten über die Zeit ändern. Dadurch entfällt die Notwendigkeit, Fehlerfälle unterschiedlich zu behandeln und Entwickler können sich immer auf einen festen Satz von Eigenschaften verlassen.
+
+# Acknowledgments
+
+My first thanks go to Mira who used her experience as a PhD advisor and spared no effort to provide  feedback on many versions of this document.
+Mira, I really enjoyed working with you on my dissertation and many other documents before, and I am very happy for how much better the result is thanks to that.
+Many thanks to Volker Markl – I could not have hoped to find for anyone more fitting as a second reviewer, and I am very glad that you seem to have enjoyed this work.
+Finally, thanks to Carsten Binnig, Matthias Hollick, and Kristian Kersting for being the rest of my committee and helping to make the whole process as enjoyable as it was.
+
+Naturally, this thesis is the result of my whole research career and there are too many people that helped with that to thank them all, so here is just a small selection.
+First, thank you, Gudrun! You make the life of so many PhD students so much easier, and I can’t even count the number of times you helped me with all sorts of problems, thank you!
+Also thanks to my office mates – Matthias, Pascal, and Mirko – who always had to listen to me talking about whatever ideas I had at the moment and yet never threw me out of the office. It has always been fun working with you.
+Thank you to Sylvia and Joscha from whom I learned so much about all the challenges faced during a PhD and who always seemed so much better at so many things than I am – I also made it! Thanks for your help.
+Thank you to Guido, who has been my inofficial second supervisor – a luxury that I think more students should be able to enjoy.
+And finally, thank you to everyone at STG, to my friends, and my family. You only get this blanket statement here, but I hope you know you are appreciated.
+
