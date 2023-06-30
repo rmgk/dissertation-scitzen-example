@@ -14,7 +14,5 @@ else
 	echo "please install https://get-coursier.io/docs/cli-overview"
 fi
 
-cp -R templates/reveal/ out/web/
-
 # cs bootstrap --repository jitpack de.rmgk:scitzen:967e2cca6f --main-class scitzen.cli.ScitzenCommandline -f -o build
 
