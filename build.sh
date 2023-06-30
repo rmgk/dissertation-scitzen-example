@@ -9,7 +9,7 @@ fi
 
 if command -v cs > /dev/null
 then
-	cs launch --repository jitpack de.rmgk:scitzen:967e2cca6f -- .
+	cs launch --repository jitpack de.rmgk:scitzen:967e2cca6f -- . || echo "In case of classfile errors, this requires Java 20"
 else
 	echo "please install https://get-coursier.io/docs/cli-overview"
 fi
