@@ -2,30 +2,30 @@
 label = chapter-microbenchmarks
 
 ::figure{label=figure-microbenchmarks-frametime}
-  ``image{converter=tex; template=/templates/tikz.scim}
-    \begin{tikzpicture}
-    \begin{axis}[
-      xbar, xmin=0, xmax=7.2,
-      width=28cm, height=3.5cm, enlarge y limits=0.4,
-      xlabel={milliseconds},
-      symbolic y coords={Frame,User code,Transaction},
-      xtick={0,1,2,3,4,5,6,7},
-      ytick=data,
-      nodes near coords, nodes near coords align={horizontal},
-    ]
-    \addplot[black,fill=lightgray,
-      error bars/.cd,
-      x dir=both,
-      x explicit
-    ] coordinates {
-      (6.944,Frame) +- (0,0)
-      (6.933,User code) +- (0,0)
-      (0.011,Transaction) +- (0,0)
-    };
-    \end{axis}
-    \end{tikzpicture}
-  ``
-  Frame time versus transaction time.
+	```convert{template={/templates/tikz.scim}; tex={}}
+		\begin{tikzpicture}
+		\begin{axis}[
+		  xbar, xmin=0, xmax=7.2,
+		  width=28cm, height=3.5cm, enlarge y limits=0.4,
+		  xlabel={milliseconds},
+		  symbolic y coords={Frame,User code,Transaction},
+		  xtick={0,1,2,3,4,5,6,7},
+		  ytick=data,
+		  nodes near coords, nodes near coords align={horizontal},
+		]
+		\addplot[black,fill=lightgray,
+		  error bars/.cd,
+		  x dir=both,
+		  x explicit
+		] coordinates {
+		  (6.944,Frame) +- (0,0)
+		  (6.933,User code) +- (0,0)
+		  (0.011,Transaction) +- (0,0)
+		};
+		\end{axis}
+		\end{tikzpicture}
+	```
+	Frame time versus transaction time.
 ::
 
 This chapter contains detailed performance evaluation of individual parts and features of :{rescala}.
@@ -128,9 +128,9 @@ parameterize our benchmarks with the number of fold reactives in the application
 
 
 ::figure{label=fig:evaluation:overhead-foldPercentage}
-  :image{/Figures/faults/benchmarks/foldPercentage100.pdf; maxwidth=0.5}
+	:image{/Figures/faults/benchmarks/foldPercentage100.pdf; maxwidth=0.5}
 
-  The cost of snapshots. X-axis is the percentage of fold reactives in the graph.
+	The cost of snapshots. X-axis is the percentage of fold reactives in the graph.
 ::
 
 Figure :ref{fig:evaluation:overhead-foldPercentage} shows the throughput for
@@ -159,10 +159,10 @@ Even in the worst case scenario :{rescala} only requires 33 microseconds per tra
 
 
 ::figure{label=figure-evaluation-restoration-rq2}
-  :image{/Figures/faults/benchmarks/restoring-fonts.pdf; maxwidth=0.36}
-  :image{/Figures/faults/benchmarks/restoreVsDerive.pdf; maxwidth=0.5}
+	:image{/Figures/faults/benchmarks/restoring-fonts.pdf; maxwidth=0.36}
+	:image{/Figures/faults/benchmarks/restoreVsDerive.pdf; maxwidth=0.5}
 
-  Left: cost of restoration. Right: restoring vs. recomputing lists of various sizes.
+	Left: cost of restoration. Right: restoring vs. recomputing lists of various sizes.
 ::
 
 :% fig:evaluation:restoring-overhead-compared-to-initialization
@@ -213,8 +213,8 @@ We also observe that recomputing the list given its size is faster than restorin
 This indicates that the performance impact of deriving as much state as possible is highly dependent on the involved operations.
 
 ::figure{label=fig:evaluation:flink-vs-rescala}
-  :image{/Figures/faults/benchmarks/flinkVSrescala-font.pdf; maxwidth=0.8}
-  Flink vs. :{rescala} snapshot performance.
+	:image{/Figures/faults/benchmarks/flinkVSrescala-font.pdf; maxwidth=0.8}
+	Flink vs. :{rescala} snapshot performance.
 ::
 
 ## (RQ3) Comparison to an Industrial-strength Data Streaming System
@@ -306,32 +306,32 @@ Philosopher are assigned to threads round-robin, each thread randomly updates on
 E.g., with 16 threads and 64 philosophers, thread #0 randomly updates one of :math{"\{p_0, p_{16}, p_{32}, p_{48}\}"} for a single measurement.
 
 ::figure{label=fig:bench:philosophers_interference}
-  ``image{converter=tex; template=/templates/parrp-eval.scim}
-    \centering
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/static-philosophers-16/alternating}
-    \put(16,51){ (a) 16 Philosophers}
-    \put(-1,17){\rotatebox{90}{Ops/ms}}
-    \put(-5,1){Threads}
-    \end{overpic}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/static-philosophers-32/alternating}
-    \put(16,51){(b) 32 Philosophers}
-    \end{overpic}
-    \vspace{2em}
-    \\
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/static-philosophers-64/alternating}
-    \put(-1,17){\rotatebox{90}{Ops/ms}}
-    \put(-5,1){Threads}
-    \put(16,51){(c) 64 Philosophers}
-    \end{overpic}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/static-philosophers-128/alternating}
-    \put(16,51){(d) 128 Philosophers}
-    \end{overpic}
-    \\
-    \vspace{0.3cm}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
-    \end{overpic}
-  ``
-  Throughput (ops/ms) per active threads, static graph.
+	```convert{template={/templates/parrp-eval.scim}; tex={}}
+		\centering
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/static-philosophers-16/alternating}
+		\put(16,51){ (a) 16 Philosophers}
+		\put(-1,17){\rotatebox{90}{Ops/ms}}
+		\put(-5,1){Threads}
+		\end{overpic}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/static-philosophers-32/alternating}
+		\put(16,51){(b) 32 Philosophers}
+		\end{overpic}
+		\vspace{2em}
+		\\
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/static-philosophers-64/alternating}
+		\put(-1,17){\rotatebox{90}{Ops/ms}}
+		\put(-5,1){Threads}
+		\put(16,51){(c) 64 Philosophers}
+		\end{overpic}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/static-philosophers-128/alternating}
+		\put(16,51){(d) 128 Philosophers}
+		\end{overpic}
+		\\
+		\vspace{0.3cm}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
+		\end{overpic}
+	```
+	Throughput (ops/ms) per active threads, static graph.
 ::
 
 To answer RQ1, we measure throughput (steps per time) with an increasing number of active threads.
@@ -346,32 +346,32 @@ finding, e.g., fine-grained locking 1.8x faster than :cite{STM; saha_mcrt-stm:_2
 
 
 ::figure{label=fig:bench:philosophers_dynamic_interference_alternating}
-  ``image{converter=tex; template=/templates/parrp-eval.scim}
-    \centering
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-16/alternating}
-    \put(16,51){ (a) 16 Philosophers}
-    \put(-1,17){\rotatebox{90}{Ops/ms}}
-    \put(-5,1){Threads}
-    \end{overpic}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-32/alternating}
-    \put(16,51){(b) 32 Philosophers}
-    \end{overpic}
-    \vspace{2em}
-    \\
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-64/alternating}
-    \put(-1,17){\rotatebox{90}{Ops/ms}}
-    \put(-5,1){Threads}
-    \put(16,51){(c) 64 Philosophers}
-    \end{overpic}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-128/alternating}
-    \put(16,51){(d) 128 Philosophers}
-    \end{overpic}
-    \\
-    \vspace{0.3cm}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
-    \end{overpic}
-  ``
-  Throughput (ops/ms) per active threads, dynamic graph.
+	```convert{template={/templates/parrp-eval.scim}; tex={}}
+		\centering
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-16/alternating}
+		\put(16,51){ (a) 16 Philosophers}
+		\put(-1,17){\rotatebox{90}{Ops/ms}}
+		\put(-5,1){Threads}
+		\end{overpic}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-32/alternating}
+		\put(16,51){(b) 32 Philosophers}
+		\end{overpic}
+		\vspace{2em}
+		\\
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-64/alternating}
+		\put(-1,17){\rotatebox{90}{Ops/ms}}
+		\put(-5,1){Threads}
+		\put(16,51){(c) 64 Philosophers}
+		\end{overpic}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-128/alternating}
+		\put(16,51){(d) 128 Philosophers}
+		\end{overpic}
+		\\
+		\vspace{0.3cm}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
+		\end{overpic}
+	```
+	Throughput (ops/ms) per active threads, dynamic graph.
 ::
 
 For RQ2, :ref{Figure; fig:bench:philosophers_dynamic_interference_alternating} shows results of the same experiments on philosophers with a dynamic :{flowgraph}.
@@ -381,32 +381,32 @@ The absolute numbers are overall lower, indicating that the cost of edge changes
 
 
 ::figure{label=fig:bench:chat_server}
-  ``image{converter=tex; template=/templates/parrp-eval.scim}
-    \centering
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/ChatServer/4}
-    \put(16,51){ (a) 4 chat rooms}
-    \put(-1,17){\rotatebox{90}{Ops/ms}}
-    \put(-5,1){Threads}
-    \end{overpic}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/ChatServer/8}
-    \put(16,51){(b) 8 chat rooms}
-    \end{overpic}
-    \vspace{2em}
-    \\
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/ChatServer/16}
-    \put(-1,17){\rotatebox{90}{Ops/ms}}
-    \put(-5,1){Threads}
-    \put(16,51){(c) 16 chat rooms}
-    \end{overpic}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/ChatServer/32}
-    \put(16,51){(d) 32 chat rooms}
-    \end{overpic}
-    \\
-    \vspace{0.3cm}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
-    \end{overpic}
-  ``
-  Throughput (ops/ms) for the chat server depending on the number of rooms.
+	```convert{template={/templates/parrp-eval.scim}; tex={}}
+		\centering
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/ChatServer/4}
+		\put(16,51){ (a) 4 chat rooms}
+		\put(-1,17){\rotatebox{90}{Ops/ms}}
+		\put(-5,1){Threads}
+		\end{overpic}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/ChatServer/8}
+		\put(16,51){(b) 8 chat rooms}
+		\end{overpic}
+		\vspace{2em}
+		\\
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/ChatServer/16}
+		\put(-1,17){\rotatebox{90}{Ops/ms}}
+		\put(-5,1){Threads}
+		\put(16,51){(c) 16 chat rooms}
+		\end{overpic}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/ChatServer/32}
+		\put(16,51){(d) 32 chat rooms}
+		\end{overpic}
+		\\
+		\vspace{0.3cm}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
+		\end{overpic}
+	```
+	Throughput (ops/ms) for the chat server depending on the number of rooms.
 ::
 
 ## RQ3 and the Chat Server
@@ -421,32 +421,32 @@ For more threads, :{parrp} behaves similar to :{handcrafted}, which can handle c
 :{stmname} struggles, as the underlying STM is not designed for high numbers of write conflicts.
 
 ::figure{label=fig:bench:read_write_comparison}
-  ``image{converter=tex; template=/templates/parrp-eval.scim}
-    \centering
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/BankAccounts/readProbability8}
-    \put(16,51){(a) 8 sets of size 32}
-    \put(-5,20){\rotatebox{90}{Ops/ms}}
-    \put(-5,1){Threads}
-    \end{overpic}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/BankAccounts/readProbability16}
-    \put(16,51){(b) 16 sets of size 16}
-    \end{overpic}
-    \vspace{2em}
-    \\
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/BankAccounts/readProbability32}
-    \put(-5,20){\rotatebox{90}{Ops/ms}}
-    \put(-5,1){Threads}
-    \put(16,51){(c) 32 sets of size 8}
-    \end{overpic}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/BankAccounts/readProbability64}
-    \put(16,51){(d) 64 sets of size 4}
-    \end{overpic}
-    \\
-    \vspace{0.3cm}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
-    \end{overpic}
-  ``
-  Throughput (ops/ms) per relative number of read operations depending on read windows sizes.
+	```convert{template={/templates/parrp-eval.scim}; tex={}}
+		\centering
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/BankAccounts/readProbability8}
+		\put(16,51){(a) 8 sets of size 32}
+		\put(-5,20){\rotatebox{90}{Ops/ms}}
+		\put(-5,1){Threads}
+		\end{overpic}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/BankAccounts/readProbability16}
+		\put(16,51){(b) 16 sets of size 16}
+		\end{overpic}
+		\vspace{2em}
+		\\
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/BankAccounts/readProbability32}
+		\put(-5,20){\rotatebox{90}{Ops/ms}}
+		\put(-5,1){Threads}
+		\put(16,51){(c) 32 sets of size 8}
+		\end{overpic}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/BankAccounts/readProbability64}
+		\put(16,51){(d) 64 sets of size 4}
+		\end{overpic}
+		\\
+		\vspace{0.3cm}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
+		\end{overpic}
+	```
+	Throughput (ops/ms) per relative number of read operations depending on read windows sizes.
 ::
 
 ## RQ4 and the Bank Accounts
@@ -468,57 +468,57 @@ Given that and that the scenario is biased towards :{stmname} due to exclusive r
 
 
 ::figure{label=fig:bench:other_topologies}
-  ``image{converter=tex; template=/templates/parrp-eval.scim}
-    \begin{overpic}[width=0.32\textwidth]{../../../Figures/Evaluation/figures/benchmark2/bargraph/8parallelizable}
-    \put(-3,5){\rotatebox{90}{\small Speedup}}
-    \put(12,28.5){\small (a) Supporting parallelism}
-    \put(18,-4){\scriptsize Build}
-    \put(31,-4){\scriptsize MultiFan}
-    \put(48,-4){\scriptsize Philosophers}
-    \put(71,-4){\scriptsize Read}
-    \put(84,-4){\scriptsize Structures}
-    \end{overpic}
-    \begin{overpic}[width=0.32\textwidth]{../../../Figures/Evaluation/figures/benchmark2/bargraph/8non-parallelizable}
-    \put(12,28.5){\small (b) Prohibiting parallelism}
-    \put(14,-4){\scriptsize DynamicStack}
-    \put(38,-4){\scriptsize ReverseFan}
-    \put(57,-4){\scriptsize SingleSwitch}
-    \put(80,-4){\scriptsize SingleWrite}
-    \end{overpic}
-    \vspace{3em}
-    \\
-    \begin{overpic}[width=0.32\textwidth]{../../../Figures/Evaluation/figures/benchmark2/bargraph/8multiplied}
-    \put(-3,5){\rotatebox{90}{\small Speedup}}
-    \put(12,28.5){\small (c) Per thread copies}
-    \put(18,-4){\scriptsize EventSeq}
-    \put(37,-4){\scriptsize Fan}
-    \put(50,-4){\scriptsize Natural}
-    \put(64,-4){\scriptsize Philosophers}
-    \put(85,-4){\scriptsize SignalSeq}
-    \end{overpic}
-    \\
-  ``
-  Throughput of different graph configurations relative to G-Lock performance using 8 threads.
+	```convert{template={/templates/parrp-eval.scim}; tex={}}
+		\begin{overpic}[width=0.32\textwidth]{../../../Figures/Evaluation/figures/benchmark2/bargraph/8parallelizable}
+		\put(-3,5){\rotatebox{90}{\small Speedup}}
+		\put(12,28.5){\small (a) Supporting parallelism}
+		\put(18,-4){\scriptsize Build}
+		\put(31,-4){\scriptsize MultiFan}
+		\put(48,-4){\scriptsize Philosophers}
+		\put(71,-4){\scriptsize Read}
+		\put(84,-4){\scriptsize Structures}
+		\end{overpic}
+		\begin{overpic}[width=0.32\textwidth]{../../../Figures/Evaluation/figures/benchmark2/bargraph/8non-parallelizable}
+		\put(12,28.5){\small (b) Prohibiting parallelism}
+		\put(14,-4){\scriptsize DynamicStack}
+		\put(38,-4){\scriptsize ReverseFan}
+		\put(57,-4){\scriptsize SingleSwitch}
+		\put(80,-4){\scriptsize SingleWrite}
+		\end{overpic}
+		\vspace{3em}
+		\\
+		\begin{overpic}[width=0.32\textwidth]{../../../Figures/Evaluation/figures/benchmark2/bargraph/8multiplied}
+		\put(-3,5){\rotatebox{90}{\small Speedup}}
+		\put(12,28.5){\small (c) Per thread copies}
+		\put(18,-4){\scriptsize EventSeq}
+		\put(37,-4){\scriptsize Fan}
+		\put(50,-4){\scriptsize Natural}
+		\put(64,-4){\scriptsize Philosophers}
+		\put(85,-4){\scriptsize SignalSeq}
+		\end{overpic}
+		\\
+	```
+	Throughput of different graph configurations relative to G-Lock performance using 8 threads.
 ::
 
 
 ::figure{label=fig:bench:reversefan_philo}
-  ``image{converter=tex; template=/templates/parrp-eval.scim}
-    \centering
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/simple/ReverseFan}
-    \put(16,51){(a) Reverse fan}
-    \put(-2,17){\rotatebox{90}{Ops/ms}}
-    \put(-5,1){Threads}
-    \end{overpic}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-128/noconflict}
-    \put(16,51){(b) Philosophers}
-    \end{overpic}
-    \\
-    \vspace{0.3cm}
-    \begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
-    \end{overpic}
-  ``
-  (a) ReverseFan detail (b) Philosopher detail.
+	```convert{template={/templates/parrp-eval.scim}; tex={}}
+		\centering
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/simple/ReverseFan}
+		\put(16,51){(a) Reverse fan}
+		\put(-2,17){\rotatebox{90}{Ops/ms}}
+		\put(-5,1){Threads}
+		\end{overpic}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/benchmark2/other-philosophers-128/noconflict}
+		\put(16,51){(b) Philosophers}
+		\end{overpic}
+		\\
+		\vspace{0.3cm}
+		\begin{overpic}[scale=0.5]{../../../Figures/Evaluation/figures/LegendHorizontal}
+		\end{overpic}
+	```
+	(a) ReverseFan detail (b) Philosopher detail.
 ::
 
 ## RQ5 and the Artificial Topology
@@ -588,26 +588,26 @@ Moreover, language-integrated error
 propagation exhibits better application performance compared to programmatic error handling.
 
 ::figure{label=fig:evaluation:monadic-errors}
-  ``image{converter=tex; template=/templates/tikz.scim}
-    \begin{tikzpicture}
-    \begin{axis}[
-      xbar, xmin=0,
-      width=12cm, height=3cm, enlarge y limits=0.75,
-      xlabel={Ops/ms},
-      xtick={0,1,2},
-      symbolic y coords={Try,Integrated},
-      ytick=data,
-      nodes near coords, nodes near coords align={horizontal},
-    ]
-    \addplot[black,fill=lightgray,
-      error bars/.cd,
-      x dir=both,
-      x explicit
-    ] coordinates {(2.03,Try) +- (0,0) (2.36,Integrated) +- (0,0)};
-    \end{axis}
-    \end{tikzpicture}
-  ``
-  Integrated error propagation versus :code{Try}-based solution.
+	```convert{template={/templates/tikz.scim}; tex={}}
+		\begin{tikzpicture}
+		\begin{axis}[
+		  xbar, xmin=0,
+		  width=12cm, height=3cm, enlarge y limits=0.75,
+		  xlabel={Ops/ms},
+		  xtick={0,1,2},
+		  symbolic y coords={Try,Integrated},
+		  ytick=data,
+		  nodes near coords, nodes near coords align={horizontal},
+		]
+		\addplot[black,fill=lightgray,
+		  error bars/.cd,
+		  x dir=both,
+		  x explicit
+		] coordinates {(2.03,Try) +- (0,0) (2.36,Integrated) +- (0,0)};
+		\end{axis}
+		\end{tikzpicture}
+	```
+	Integrated error propagation versus :code{Try}-based solution.
 ::
 
 To compare different approaches to error handling we implemented an experiment using Scala's :code{Try} to propagate errors handle errors,
@@ -630,8 +630,8 @@ In this case, the synergy is due to the fact that :{rescala} can automatically i
 # Combined Effects of Errors and Snapshots
 
 ::figure{label=fig:evaluation:overhead-barcharts}
-  :image{/Figures/faults/benchmarks/barchart-evaluation_errors+snapshots.svg}
-  Cost of snapshots and errors. Throughput measured in: Errors per 100 ms; Restore×0 per 10 ms; Restore×1 and ×10 per 1 ms; others per 1 μs.
+	:image{/Figures/faults/benchmarks/barchart-evaluation_errors+snapshots.svg}
+	Cost of snapshots and errors. Throughput measured in: Errors per 100 ms; Restore×0 per 10 ms; Restore×1 and ×10 per 1 ms; others per 1 μs.
 ::
 
 To understand the combined impact of snapshots and error propagation on :{rescala} we run several experiments with and without support for error propagation and snapshots.

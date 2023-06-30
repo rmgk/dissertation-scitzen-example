@@ -3,7 +3,7 @@
 \usetikzlibrary{shapes,backgrounds,calc,positioning}
 \usepackage{pgfplots}
 
-:{xetex fonts}
+:{xetexFonts}
 
 \begin{document}
 

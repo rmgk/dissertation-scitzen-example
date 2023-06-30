@@ -41,35 +41,35 @@ We use the name :emph{tuning}:cite{; Kato2016} to refer to this process in the r
 
 
 ::figure{label=fig:background-code-live}
-  ``{label=line:back:}
-    // input sensor for temperature
-    val temperature = Evt[Double] :§evt§
-    // filter very high and low temperatures an outliers
-    val filtered =
-      temperature.filter(_ <= 100).filter(_  >= -40) :§filter§
-    // build a history of up to 50 temperature values
-    val history: Signal[Seq[Double]] = filtered.last(50) :§last§
-    // an aggregation function that may change over time
-    val aggregation: Var[Seq[Double] => Double] = Var(average) :§var§
-    // apply the aggregation function to the temperatures
-    val aggregated = Signal { :§sig-expr§
-      val f: Seq[Double] => Double = aggregation.value
-      f(history.value)
-    }
-    // select which values to display in the dashboard
-    val onDisplay: Var[List[Signal[Seq[Double]]]] = Var(List(history, aggregated)) :§onDisplay§
-    // assume a generic rendering function for values
-    def render = {
-      case d: Double => ...
-      case l: List[Double] => ...
-    }
-    // render selected signals on the dashboard
-    val dashboard = Signal { :§dashboard§
-      for (item <- onDisplay.value)
-        yield render(item.value)
-    }
-  ``
-  Dashboard application.
+	```code{lang=scala; label=line:back:}
+		// input sensor for temperature
+		val temperature = Evt[Double] :§evt§
+		// filter very high and low temperatures an outliers
+		val filtered =
+		  temperature.filter(_ <= 100).filter(_  >= -40) :§filter§
+		// build a history of up to 50 temperature values
+		val history: Signal[Seq[Double]] = filtered.last(50) :§last§
+		// an aggregation function that may change over time
+		val aggregation: Var[Seq[Double] => Double] = Var(average) :§var§
+		// apply the aggregation function to the temperatures
+		val aggregated = Signal { :§sig-expr§
+		  val f: Seq[Double] => Double = aggregation.value
+		  f(history.value)
+		}
+		// select which values to display in the dashboard
+		val onDisplay: Var[List[Signal[Seq[Double]]]] = Var(List(history, aggregated)) :§onDisplay§
+		// assume a generic rendering function for values
+		def render = {
+		  case d: Double => ...
+		  case l: List[Double] => ...
+		}
+		// render selected signals on the dashboard
+		val dashboard = Signal { :§dashboard§
+		  for (item <- onDisplay.value)
+		    yield render(item.value)
+		}
+	```
+	Dashboard application.
 ::
 
 # The Chapter’s Running Example
@@ -91,8 +91,8 @@ Because the displayed list of values is a signal (a :code{Var} to be precise),
 the concrete displayed items may change, resulting in a dynamic :{flowgraph}.
 
 ::figure{label=fig:reactive-inspector}
-  :image{maxwidth=0.6; /Figures/Screenshots/reactive-inspector-without-time-travel-rotated.png}
-  Reactive Inspector user interface.
+	:image{maxwidth=0.6; /Figures/Screenshots/reactive-inspector-without-time-travel-rotated.png}
+	Reactive Inspector user interface.
 ::
 
 # Reactive Debugging
@@ -156,8 +156,8 @@ When a breakpoint is triggered, Reactive Inspector delegates to the native Chrom
 
 
 ::figure{label=fig:reactive-inspector-modification}
-  :image{maxwidth=0.5; /Figures/Screenshots/reactive-inspector-with-time-travel-rotated.png}
-  Reactive Inspector with extensions to modify the :{flowgraph}.
+	:image{maxwidth=0.5; /Figures/Screenshots/reactive-inspector-with-time-travel-rotated.png}
+	Reactive Inspector with extensions to modify the :{flowgraph}.
 ::
 
 # From Inspecting to Modifying
@@ -251,13 +251,13 @@ The reactive debugger then displays a drop-down list of possible choices.
 In the example, the developer could provide an average and a sum function,
 as an enumeration of aggregation schemes:
 
-``
-  enum Aggregate(val name: String,
-                 val compute: Seq[Double] => Double) {
-    case Average extends Aggregate("average", ...)
-    case Sum extends Aggregate("sum", ...)
-  }
-``
+```
+	enum Aggregate(val name: String,
+	               val compute: Seq[Double] => Double) {
+	  case Average extends Aggregate("average", ...)
+	  case Sum extends Aggregate("sum", ...)
+	}
+```
 
 ## Tuning the :{FlowGraph}
 

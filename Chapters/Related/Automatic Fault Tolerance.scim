@@ -28,7 +28,7 @@ where failed devices can always be replaced.
 
 Formal methods have been used for parts of data center computations.
 Cloud :cite{Calculus; Jarraya2012} accounts for security regarding firewall configurations,
-and :cite{style=name; Laemmel2008} studied MapReduce as a functional programming paradigm.
+and :cite{Laemmel2008; style=author} studied MapReduce as a functional programming paradigm.
 
 
 ## Generalized Batch and Stream Processing Paradigms
@@ -56,7 +56,7 @@ In contrast to :{cvtr}, the propagation of values extends across the distributio
 However, since the distributed state is immutable, the abstractions are not well suited to interactive or collaborative applications.
 
 
-:cite{style=name; Viering2018} develop a typing discipline for a core model that captures the above approaches to ensure correct execution of such systems in the presence of faults.
+:cite{Viering2018; style=author} develop a typing discipline for a core model that captures the above approaches to ensure correct execution of such systems in the presence of faults.
 This static approach explicitly assumes the existence of central coordination and replacements for failed devices, singling them out as the central solutions for automatic fault tolerance in a cluster environment.
 We generally have neither coordination nor replacements available for :{apps}.
 

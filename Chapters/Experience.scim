@@ -50,13 +50,13 @@ For example, to count how often an event is fired,
 a mutable variable is updated inside a :code{map} expression,
 and the value of the variable is propagated:
 
-``
-  var count = 0
-  val mapped: Event[Int] = event.map { _ =>
-    count += 1 // bad: mutation inside operator
-    count
-  }
-``
+```
+	var count = 0
+	val mapped: Event[Int] = event.map { _ =>
+	  count += 1 // bad: mutation inside operator
+	  count
+	}
+```
 
 However, mutations of :code{count} outside the user-defined function for the :code{map} operator are propagated.
 The idiomatic REScala solution is to use :code{fold},
@@ -64,11 +64,11 @@ an operator with internal state managed by the reactive language,
 that applies a user defined function
 to generate the new state from the old state:
 
-``
-  val counted: Signal[Int] =
-    event.fold(0) { (count, _) => count + 1 }
-  // or just `event.count`
-``
+```
+	val counted: Signal[Int] =
+	  event.fold(0) { (count, _) => count + 1 }
+	// or just `event.count`
+```
 
 In our experience, fold is adequate to model any stateful computation,
 but it requires programmers to understand purely functional state management
@@ -79,13 +79,13 @@ Examples are user interfaces, where a user modifies the same value by entering t
 Our case studies include an example where an elevator computes the time it has spent waiting on the current floor,
 depending on a :code{reachedFloor} event, which resets the value, and a :code{tick} event, which increases the value:
 
-``
-  val waitingTime: Signal[Int] =
-    reachedFloor.reset(0) { _ =>
-      tick.iterate(0) { acc =>
-        if (isWaiting()) acc + 1 else acc
-    }}
-``
+```
+	val waitingTime: Signal[Int] =
+	  reachedFloor.reset(0) { _ =>
+	    tick.iterate(0) { acc =>
+	      if (isWaiting()) acc + 1 else acc
+	  }}
+```
 
 The code above requires a nested call of :code{iterate} inside a :code{reset} both of which have semantics derived from fold.
 Nesting complex operators is potentially hard to understand even for seasoned :{efrp} developers.
@@ -95,13 +95,13 @@ REScala supports an extended syntax for folds,
 which takes a list of events and associated update functions,
 to compute the next state from the current one:
 
-``{label=line:extended-fold:}
-  val waitingTime: Signal[Int] =
-    Events.fold(0)( acc => Seq(
-      reachedFloor >> {_ => 0},  :§patterns§
-      tick         >> {_ => if (isWaiting()) acc + 1 else acc }
-    ))
-``
+```code{lang=scala; label=line:extended-fold:}
+	val waitingTime: Signal[Int] =
+	  Events.fold(0)( acc => Seq(
+	    reachedFloor >> {_ => 0},  :§patterns§
+	    tick         >> {_ => if (isWaiting()) acc + 1 else acc }
+	  ))
+```
 
 The extended fold
 states the intention more clearly.
@@ -131,13 +131,13 @@ As a contrived example – for the sake of brevity –
 consider a door system that imperatively turns the lights on or off,
 when the doors open or close:
 
-``
-  var light = On
-  object DoorSystem {
-  	def onClose() = { light = Off }
-  	def onOpen() = { light = On }
-  }
-``
+```
+	var light = On
+	object DoorSystem {
+		def onClose() = { light = Off }
+		def onOpen() = { light = On }
+	}
+```
 
 Other objects rely on the state of :code{light}
 and must be notified when it changes,
@@ -145,14 +145,14 @@ but the API does not specify how notifications happen.
 With :{efrp} dependencies are made explicit,
 and notifications happen automatically:
 
-``
-  object DoorSystem {
-  	val closed: Signal[Boolean]
-  }
-  val light = Signal {
-  	if (DoorSystem.closed()) Off else On
-  }
-``
+```
+	object DoorSystem {
+		val closed: Signal[Boolean]
+	}
+	val light = Signal {
+		if (DoorSystem.closed()) Off else On
+	}
+```
 
 In the updated example,
 the :code{closed} state of the door is a proper part of the public API of the :code{DoorSystem} object,
@@ -178,23 +178,23 @@ For events, it is often useful to use the :code{list} operator
 (Lines :ref{line:testing:; line=list1}, :ref{line:testing:; line=list2})
 to make all occurrences of the event accessible as a list:
 
-``{label=line:testing:}
-  val input = Evt[String]
-  val greeting: Event[String] =
-    input.map(name => s"Hello $name")  :§map§
-  val inputLog: Signal[List[String]] =
-    input.list()  :§list1§
-  val greetingLog: Event[List[String]] =
-    greeting.list()  :§list2§
+```code{lang=scala; label=line:testing:}
+	val input = Evt[String]
+	val greeting: Event[String] =
+	  input.map(name => s"Hello $name")  :§map§
+	val inputLog: Signal[List[String]] =
+	  input.list()  :§list1§
+	val greetingLog: Event[List[String]] =
+	  greeting.list()  :§list2§
 
-  assert(inputLog.now == Nil)
-  assert(greetingLog.now == Nil)
+	assert(inputLog.now == Nil)
+	assert(greetingLog.now == Nil)
 
-  input.fire("world")
+	input.fire("world")
 
-  assert(inputLog.now == List("world"))
-  assert(greetingLog.now == List("Hello world"))
-``
+	assert(inputLog.now == List("world"))
+	assert(greetingLog.now == List("Hello world"))
+```
 
 
 :{efrp} programs are written in a more functional style
@@ -209,13 +209,13 @@ Assume that the value of some :code{input} signal is
 not under control of the tests,
 but a derived signal :code{testMe} is tested:
 
-``{label=line:testing-mocking:}
-  val input: Signal[String] = ...
-  val testMe = Signal { input().toLowerCase  }
+```code{lang=scala; label=line:testing-mocking:}
+	val input: Signal[String] = ...
+	val testMe = Signal { input().toLowerCase  }
 
-  reevaluate(testMe).assuming(input -> "TEST String")  :§mock§
-  assert(testMe.now == "test string")
-``
+	reevaluate(testMe).assuming(input -> "TEST String")  :§mock§
+	assert(testMe.now == "test string")
+```
 
 The code in :ref{Line; line:testing-mocking:; line=mock} forces a reevaluation of the signal,
 and simulates the values of the inputs of the signal.
@@ -299,10 +299,10 @@ For example, consider the :code{||} operator in REScala,
 which is derived from the following event expression:
 
 
-``
-  def || [A](a: Event[A], b: Event[A]): Event[A] =
-  	Event { if (a.value.nonEmpty) a.value else b.value }
-``
+```
+	def || [A](a: Event[A], b: Event[A]): Event[A] =
+		Event { if (a.value.nonEmpty) a.value else b.value }
+```
 
 
 Accessing the value of an event inside an event expression,
@@ -329,12 +329,12 @@ Consider creating a button for a UI,
 deriving a label signal that states how often the button was clicked,
 and displaying the label text on the button itself:
 
-``
-  val button = new Button
-  val label: Signal[String] = button.click.count
-    .map(c => s"This button was clicked $c times")
-  label.observe(txt => button.text = txt)
-``
+```
+	val button = new Button
+	val label: Signal[String] = button.click.count
+	  .map(c => s"This button was clicked $c times")
+	label.observe(txt => button.text = txt)
+```
 
 The last line sets the text of the button when the label changes – an imperative interaction not directly allowed in a pure language.
 In pure languages, the label text of the button has to be provided when the button is created,
@@ -342,12 +342,12 @@ which leads to a cyclic definition (button depends on label, and label on button
 A solution is shown in the following code example
 where the handler is registered as part of the button creation and no imperative change is required:
 
-``
-  def pipeline(click: Event[Unit]): Signal[String] =
-    click.count
-    .map(c => s"This button was clicked $c times")
-  val button = new Button(pipeline)
-``
+```
+	def pipeline(click: Event[Unit]): Signal[String] =
+	  click.count
+	  .map(c => s"This button was clicked $c times")
+	val button = new Button(pipeline)
+```
 
 We provide a function to the button,
 and the function describes the pipeline to process the button clicks.
@@ -373,8 +373,8 @@ The integration allows programmers to add and reconnect events and signals as re
 label = rq:cyclic-graphs
 
 ::figure{label=fig:rq:cycles}
-  :image{/Figures/Graphs/cycles.pdf}
-  Creating a cycle
+	:image{/Figures/Graphs/cycles.pdf}
+	Creating a cycle
 ::
 
 :{efrp} languages require that the :{flowgraph} is acyclic
@@ -383,10 +383,10 @@ but most :{efrp} languages do not statically enforce the graph to be acyclic.
 However, problems with cycles only rarely occur in practice.
 Consider the following code to create a cycle between signals a and b:
 
-``
-  val a = Signal { b.value + 1 }
-  val b = Signal { a.value - 1 }
-``
+```
+	val a = Signal { b.value + 1 }
+	val b = Signal { a.value - 1 }
+```
 
 Figure :ref{fig:rq:cycles}(A) shows the cycle the code
 is supposed to create.
@@ -394,12 +394,12 @@ However, the code does not compile for :{rescala},
 because the embedding language prevents cyclic definitions of variables.
 To create a cyclic graph, imperative code is used:
 
-``
-  val h = Var(Signal(0))
-  val a = Signal { h.value.value + 1 }
-  val b = Signal { a.value - 1 }
-  h.set(b)
-``
+```
+	val h = Var(Signal(0))
+	val a = Signal { h.value.value + 1 }
+	val b = Signal { a.value - 1 }
+	h.set(b)
+```
 
 Figure :ref{fig:rq:cycles}(B) illustrates this approach.
 The first line creates the source signal named :code{h}

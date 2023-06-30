@@ -44,20 +44,20 @@ as discussed in :ref{Section; section-performance-error_propagation}.
 
 
 ::figure{label=fig-shared_calendar-code-errors}
-  ``{label=line-background-shared_calendar-code-errors}
-    val selectedEntries = Signal {  :§selected-entries-signal-expression§
-      entrySet.value.toSet.filter { entry =>  :§selected-entries-filter-entrySet§
-        try selectedWeek.value == Week.of(entry.date.value)   :§signal-expression-apply§
-        catch { case DisconnectedSignal => false }  :§faults:access-try-catch§
-      }
-    } :§selected-entries-signal-expression-end§
+	```code{lang=scala; label=line-background-shared_calendar-code-errors}
+		val selectedEntries = Signal {  :§selected-entries-signal-expression§
+		  entrySet.value.toSet.filter { entry =>  :§selected-entries-filter-entrySet§
+		    try selectedWeek.value == Week.of(entry.date.value)   :§signal-expression-apply§
+		    catch { case DisconnectedSignal => false }  :§faults:access-try-catch§
+		  }
+		} :§selected-entries-signal-expression-end§
 
-    selectedEntries.observe(  :§observer-signal§
-      onValue = Ui.displayEntryList,
-      onError = Ui.displayError)  :§observer-signal-onerror§
-  ``
+		selectedEntries.observe(  :§observer-signal§
+		  onValue = Ui.displayEntryList,
+		  onError = Ui.displayError)  :§observer-signal-onerror§
+	```
 
-  Excerpt of the updated source code for the shared calendar application.
+	Excerpt of the updated source code for the shared calendar application.
 ::
 
 # A Shared Calendar with Errors
@@ -98,10 +98,10 @@ e.g., converting an exception of a networking library to an error in the :{flowg
 Consider an existing networking library with a callback-based API.
 When a timeout occurs in the network, the imperative library callback is converted into a reactive propagation:
 
-``
-  val fromNetwork = Evt[NetworkMessages]()
-  Network.onTimeout { error => fromNetwork.admit(error) }
-``
+```
+	val fromNetwork = Evt[NetworkMessages]()
+	Network.onTimeout { error => fromNetwork.admit(error) }
+```
 
 
 
@@ -120,11 +120,11 @@ In the calendar example in Figure :ref{fig-shared_calendar-code}, any error is d
 handler defined on the signal in :ref{Line; line-background-shared_calendar-code-errors; line=observer-signal}
 using the extended observer API:
 
-``
-  selectedEntries.observe(
-    onValue = Ui.displayEntryList,
-    onError = Ui.displayError)
-``
+```
+	selectedEntries.observe(
+	  onValue = Ui.displayEntryList,
+	  onError = Ui.displayError)
+```
 
 
 Instead of simply observing errors,
@@ -132,10 +132,10 @@ the application developer can recover from the error inside the :{flowgraph} usi
 the :code{recover} operator for signals and events, which is parameterized with
 a recovery function that converts an error to a normal value.
 
-``
-  val input: Signal[String] = ...
-  val recovered: Signal[String] = input.recover{ error => error.toString }
-``
+```
+	val input: Signal[String] = ...
+	val recovered: Signal[String] = input.recover{ error => error.toString }
+```
 
 In the example, the :code{input} signal may contain an error instead of a string, but the :code{recovered} signal converts all errors into string values.
 The value is then propagated as the output of the :code{recover} operator.
@@ -163,14 +163,14 @@ For example, the shared calendar in Figure :ref{fig-shared_calendar-code} filter
 All entries containing an error are removed using a Scala :code{try/catch} block:
 
 
-``{label=listing-inline-error_expression}
-  val selectedEntries = Signal {
-    entrySet.value.filter { entry => :§filter§
-      try selectedWeek.value == Week.of(entry.date.value) :§date§
-      catch { case e: NetworkError => false } :§catch§
-    }
-  }
-``
+```code{lang=scala; label=listing-inline-error_expression}
+	val selectedEntries = Signal {
+	  entrySet.value.filter { entry => :§filter§
+	    try selectedWeek.value == Week.of(entry.date.value) :§date§
+	    catch { case e: NetworkError => false } :§catch§
+	  }
+	}
+```
 
 When the :code{entry.date} (:ref{Line; listing-inline-error_expression; line=date}) contains an error,
 the error is thrown as a Scala exception and handled in the :code{catch} by returning false (:ref{Line; listing-inline-error_expression; line=catch}),
@@ -203,9 +203,9 @@ Thus, unlike other derived reactives, a :code{fold} signal accesses its own curr
 i.e., the fold (indirectly) depends on the complete history of the input event.
 For example, the signal :code{allEntries} collects all new entries into a set.
 
-``
-  allEntries.fold(Set.empty) { (entries, entry) => entries + entry}
-``
+```
+	allEntries.fold(Set.empty) { (entries, entry) => entries + entry}
+```
 
 The current state of the fold (:code{entries}) is treated like any ordinary dependency.
 If it is accessed and it holds an error, the error is thrown as a Scala exception.
@@ -219,14 +219,14 @@ We present an example for fold with custom error handling next.
 
 We illustrate custom error handling using fold with the implementation of the :code{count} operator.
 
-``{label=line:error-example:}
-  def count() = fold(0) { (counter, occurrence) =>  :§init§
-    occurrence // access the (unused) value to propagate errors  :§access-occurrence§
-    try counter + 1 // increase count in non-error case  :§access-accumulator§
-    // continue counting after errors
-    catch { case (value, error) => value + 1 } :§catch§
-  }
-``
+```code{lang=scala; label=line:error-example:}
+	def count() = fold(0) { (counter, occurrence) =>  :§init§
+	  occurrence // access the (unused) value to propagate errors  :§access-occurrence§
+	  try counter + 1 // increase count in non-error case  :§access-accumulator§
+	  // continue counting after errors
+	  catch { case (value, error) => value + 1 } :§catch§
+	}
+```
 
 The operator counts the number of non-error event occurrences.
 The :code{count} signal starts with its initial state initialized to zero (:ref{Line; line:error-example:; line=init}).
@@ -266,10 +266,10 @@ The abort operator is useful for :{flowgraph}s, which are unable to handle error
 The abort operator mirrors any value of the input reactive, but if the input reactive propagates an error then the transaction is guaranteed to abort.
 Thus, the :code{derived} signal in the following example can safely be used by code that is not aware of errors.
 
-``
-  val input: Signal[A] = ...
-  val derived: Signal[A] = input.abortOnError()
-``
+```
+	val input: Signal[A] = ...
+	val derived: Signal[A] = input.abortOnError()
+```
 
 In addition to explicitly using the abort operator we also abort transactions when an error reaches an observer that has no error handler.
 This aborting by default behavior enables existing code that does not specify error handlers to be used without changes.
@@ -281,33 +281,33 @@ The code that does not deal with errors is still semantically broken if an error
 
 
 ::figure{label=fig:running-ignore-faults}
-  ``highlight{label=listing-music-ignore_error}
-    val changeTrack: Evt[Track] = Evt[Track]() :§change-track-event§
-    val currentTrack: Signal[Track] = changeTrack.latest() :§initial-state§
-    val currentScreen = composeInfoScreen(currentTrack) :§call-compose§
+	```{highlight; label=listing-music-ignore_error}
+		val changeTrack: Evt[Track] = Evt[Track]() :§change-track-event§
+		val currentTrack: Signal[Track] = changeTrack.latest() :§initial-state§
+		val currentScreen = composeInfoScreen(currentTrack) :§call-compose§
 
-    currentTrack.observe(playMusic) :§first-observe§
-    currentScreen.observe(displayScreen) :§last-observe§
+		currentTrack.observe(playMusic) :§first-observe§
+		currentScreen.observe(displayScreen) :§last-observe§
 
-    def composeInfoScreen(track: Signal[Track]): Signal[Screen] = { :§composing-function§
-      val metadata = track.map(loadMetadata) :§map-user§
-      val infoScreen = Signal {:§signal-expression§
-        renderInfoScreen(track.value, metadata.value)
-      }
-      infoScreen
-    }
+		def composeInfoScreen(track: Signal[Track]): Signal[Screen] = { :§composing-function§
+		  val metadata = track.map(loadMetadata) :§map-user§
+		  val infoScreen = Signal {:§signal-expression§
+		    renderInfoScreen(track.value, metadata.value)
+		  }
+		  infoScreen
+		}
 
-    def loadMetadata(t: Track): Data = {
-      :hl§{... fetch data, assume no faults occur ...}§ :§access-unreliable-resource§
-    }
+		def loadMetadata(t: Track): Data = {
+		  :hl§{... fetch data, assume no faults occur ...}§ :§access-unreliable-resource§
+		}
 
-    def renderInfoScreen(t: Track, md: Data): Screen
-    def playMusic(t: Track): Music
-    def displayScreen(s: Screen): Unit
-  ``
-  :image{/Figures/Graphs/music-app-example.pdf}
+		def renderInfoScreen(t: Track, md: Data): Screen
+		def playMusic(t: Track): Music
+		def displayScreen(s: Screen): Unit
+	```
+	:image{/Figures/Graphs/music-app-example.pdf}
 
-  Music application without fault handling.
+	Music application without fault handling.
 ::
 
 # Alternatives for Error Handling in Dataflow Languages
@@ -321,76 +321,76 @@ The metadata is then passed through the application (:ref{Line; listing-music-ig
 There are different strategies to handle this failure which we discuss next.
 
 ::figure{label=fig:manual-exception-wanted-faults}
-  ``highlight{label=line:wanted-}
-    val changeTrack: Evt[Track] = Evt[Track]()
-    val currentTrack: Signal[Track] = changeTrack.latest()
-    val currentScreen = composeInfoScreen(currentTrack)
+	```{highlight; label=line:wanted-}
+		val changeTrack: Evt[Track] = Evt[Track]()
+		val currentTrack: Signal[Track] = changeTrack.latest()
+		val currentScreen = composeInfoScreen(currentTrack)
 
-    currentTrack.observe(playMusic)
-    :hl§{try \{}§ currentScreen.observe(displayScreen) :hl§{\}}§
-    :hl§{catch \{}§
-      :hl§{case SomeException => displayScreen(errorScreen)}§ :§display-error§
-    :hl§{\}}§
+		currentTrack.observe(playMusic)
+		:hl§{try \{}§ currentScreen.observe(displayScreen) :hl§{\}}§
+		:hl§{catch \{}§
+		  :hl§{case SomeException => displayScreen(errorScreen)}§ :§display-error§
+		:hl§{\}}§
 
-    def composeInfoScreen(track: Signal[Track]): Signal[Screen] = {
-      val metadata = track.map(loadMetadata)
-      val infoScreen = Signal {
-        renderInfoScreen(track.value, metadata.value)
-      }
-      infoScreen
-    }
+		def composeInfoScreen(track: Signal[Track]): Signal[Screen] = {
+		  val metadata = track.map(loadMetadata)
+		  val infoScreen = Signal {
+		    renderInfoScreen(track.value, metadata.value)
+		  }
+		  infoScreen
+		}
 
-    def loadMetadata(t: Track): Data = {
-      ... :hl§{throw SomeException}§ ... :§throw§
-    }
+		def loadMetadata(t: Track): Data = {
+		  ... :hl§{throw SomeException}§ ... :§throw§
+		}
 
-    def renderInfoScreen(t: Track, md: Data): Screen
-    def playMusic(t: Track): Music
-    def displayScreen(s: Screen): Unit
-  ``
-  Incorrect example: Exception not thrown in scope of handler.
+		def renderInfoScreen(t: Track, md: Data): Screen
+		def playMusic(t: Track): Music
+		def displayScreen(s: Screen): Unit
+	```
+	Incorrect example: Exception not thrown in scope of handler.
 ::
 
 
 ::figure{label=fig:manual-exception-faults}
-  ``highlight{label=line:manual-}
-    val changeTrack: Evt[Track] = Evt[Track]()
-    val currentTrack: Signal[Track] = changeTrack.latest()
-    val currentScreen = composeInfoScreen(currentTrack)
+	```{highlight; label=line:manual-}
+		val changeTrack: Evt[Track] = Evt[Track]()
+		val currentTrack: Signal[Track] = changeTrack.latest()
+		val currentScreen = composeInfoScreen(currentTrack)
 
-    currentTrack.observe(playMusic)
-    currentScreen.observe(displayScreen)
+		currentTrack.observe(playMusic)
+		currentScreen.observe(displayScreen)
 
-    :hl§{try}§ {
-      changeTrack.fire(beethoven) :§set§
-    :hl§{\} catch \{}§
-      :hl§{case SomeException =>}§
-        :hl§{// the code here should not have to know}§
-        :hl§{// about loadMetadata}§
-    }
+		:hl§{try}§ {
+		  changeTrack.fire(beethoven) :§set§
+		:hl§{\} catch \{}§
+		  :hl§{case SomeException =>}§
+		    :hl§{// the code here should not have to know}§
+		    :hl§{// about loadMetadata}§
+		}
 
-    def composeInfoScreen(track: Signal[Track]): Signal[Screen] = {
-      val metadata = :hl§{try}§ {
-          track.map(loadMetadata) :§map§
-        :hl§{\} catch \{}§
-          :hl§{case SomeException =>}§
-            :hl§{// cannot handle here}§
-        }
-      val infoScreen = Signal {
-        renderInfoScreen(track.value, metadata.value)
-      }
-      infoScreen
-    }
+		def composeInfoScreen(track: Signal[Track]): Signal[Screen] = {
+		  val metadata = :hl§{try}§ {
+		      track.map(loadMetadata) :§map§
+		    :hl§{\} catch \{}§
+		      :hl§{case SomeException =>}§
+		        :hl§{// cannot handle here}§
+		    }
+		  val infoScreen = Signal {
+		    renderInfoScreen(track.value, metadata.value)
+		  }
+		  infoScreen
+		}
 
-    def loadMetadata(t: Track): Data = {
-      ... :hl§{throw SomeException}§ ...
-    }
+		def loadMetadata(t: Track): Data = {
+		  ... :hl§{throw SomeException}§ ...
+		}
 
-    def renderInfoScreen(t: Track, md: Data): Screen
-    def playMusic(t: Track): Music
-    def displayScreen(s: Screen): Unit
-  ``
-  Handlers not at the correct position to handle error
+		def renderInfoScreen(t: Track, md: Data): Screen
+		def playMusic(t: Track): Music
+		def displayScreen(s: Screen): Unit
+	```
+	Handlers not at the correct position to handle error
 ::
 
 
@@ -418,39 +418,39 @@ This is only possible by propagating the error in the :{flowgraph}.
 
 
 ::figure{label=fig:mondaic-faults}
-  ``highlight{label=line:monadic-}
-    val changeTrack: Evt[Track] = Evt[Track]()
-    val currentTrack: Signal[Track] = changeTrack.latest()
-    val currentScreen = composeInfoScreen(currentTrack)
+	```{highlight; label=line:monadic-}
+		val changeTrack: Evt[Track] = Evt[Track]()
+		val currentTrack: Signal[Track] = changeTrack.latest()
+		val currentScreen = composeInfoScreen(currentTrack)
 
-    currentTrack.observe(playMusic)
-    currentScreen.observe {:§good-observe§
-        :hl§{case Success(screen) =>}§ displayScreen(screen)
-        :hl§{case Failure(e) =>}§ :hl§{displayScreen(makeErrorScreen(e))}§
-      }
+		currentTrack.observe(playMusic)
+		currentScreen.observe {:§good-observe§
+		    :hl§{case Success(screen) =>}§ displayScreen(screen)
+		    :hl§{case Failure(e) =>}§ :hl§{displayScreen(makeErrorScreen(e))}§
+		  }
 
-    def composeInfoScreen(track: Signal[Track]): Signal[:hl§{Try[Screen]}§] = {
-      val metadata = track.map(loadMetadata)
-      val infoScreen = Signal {
-        metadata.value :hl§{match \{}§:§sprinkled-error-handling§
-          :hl§{case Successful(unwrappedData) =>}§
-            renderInfoScreen(track.value, :hl§{unwrappedData}§)
-          :hl§{case Failure(e) => Failure(e)}§
-        }
-      }
-      infoScreen
-    }
+		def composeInfoScreen(track: Signal[Track]): Signal[:hl§{Try[Screen]}§] = {
+		  val metadata = track.map(loadMetadata)
+		  val infoScreen = Signal {
+		    metadata.value :hl§{match \{}§:§sprinkled-error-handling§
+		      :hl§{case Successful(unwrappedData) =>}§
+		        renderInfoScreen(track.value, :hl§{unwrappedData}§)
+		      :hl§{case Failure(e) => Failure(e)}§
+		    }
+		  }
+		  infoScreen
+		}
 
-    def loadMetadata(t: Track): :hl§{Try[Data]}§ = :§return-type§
-      :hl§{Try}§ {
-        ... throw SomeException ...
-      }
+		def loadMetadata(t: Track): :hl§{Try[Data]}§ = :§return-type§
+		  :hl§{Try}§ {
+		    ... throw SomeException ...
+		  }
 
-    def renderInfoScreen(t: Track, md: Data): Screen
-    def playMusic(t: Track): Music
-    def displayScreen(s: Screen): Unit
-  ``
-  Errors as values.
+		def renderInfoScreen(t: Track, md: Data): Screen
+		def playMusic(t: Track): Music
+		def displayScreen(s: Screen): Unit
+	```
+	Errors as values.
 ::
 
 ## Monadic Approach: Encoding Errors as Values
@@ -469,48 +469,48 @@ Mixing error handling code into the normal control flow hides the main logic and
 and – especially when definitions of reactives are concise – unwrapping values twice is impractical.
 For example, compare the original expression and the one with manual error handling (using typical syntactic sugar):
 
-``
-  Signal {
-    renderInfoScreen(track.value, metadata.value)
-  }
+```
+	Signal {
+	  renderInfoScreen(track.value, metadata.value)
+	}
 
-  Signal {
-    metadata.value.map {unwrappedData =>
-      renderInfoScreen(track.value, unwrappedData)
-    }
-  }
+	Signal {
+	  metadata.value.map {unwrappedData =>
+	    renderInfoScreen(track.value, unwrappedData)
+	  }
+	}
 
-``
+```
 
 
 
 ::figure{label=fig:language-faults}
-  ``{label=line:language-}
-    val changeTrack: Evt[Track] = Evt[Track]()
-    val currentTrack: Signal[Track] = changeTrack.latest() :§fold-signal§
-    val currentScreen = composeInfoScreen(currentTrack)
+	```code{lang=scala; label=line:language-}
+		val changeTrack: Evt[Track] = Evt[Track]()
+		val currentTrack: Signal[Track] = changeTrack.latest() :§fold-signal§
+		val currentScreen = composeInfoScreen(currentTrack)
 
-    currentTrack.observe(playMusic)
-    currentScreen.recover(makeErrorPage)} :§recover§
-      .observe(displayScreen)
+		currentTrack.observe(playMusic)
+		currentScreen.recover(makeErrorPage)} :§recover§
+		  .observe(displayScreen)
 
-    def composeInfoScreen(track: Signal[Track]): Signal[Screen] = {
-      val metadata = track.map(loadMetadata) :§map-base-signal§
-      val infoScreen = Signal { :§derived-signal§
-        renderInfoScreen(track.value, metadata.value)
-      }
-      infoScreen
-    }
+		def composeInfoScreen(track: Signal[Track]): Signal[Screen] = {
+		  val metadata = track.map(loadMetadata) :§map-base-signal§
+		  val infoScreen = Signal { :§derived-signal§
+		    renderInfoScreen(track.value, metadata.value)
+		  }
+		  infoScreen
+		}
 
-    def loadMetadata(t: Track): Data = { :§line:faul-propagation:load-metadata-throwing-exception§
-      ... throw SomeException ... :§thrown§
-    }
+		def loadMetadata(t: Track): Data = { :§line:faul-propagation:load-metadata-throwing-exception§
+		  ... throw SomeException ... :§thrown§
+		}
 
-    def renderInfoScreen(t: Track, md: Data): Screen
-    def playMusic(t: Track): Music
-    def displayScreen(s: Screen): Unit
-  ``
-  Example reactive program with error handling.
+		def renderInfoScreen(t: Track, md: Data): Screen
+		def playMusic(t: Track): Music
+		def displayScreen(s: Screen): Unit
+	```
+	Example reactive program with error handling.
 ::
 
 
@@ -545,7 +545,7 @@ For example, to get correct results from a replicated database it is a common st
 The value returned by the majority of the replicas is considered the correct result.
 However, to get the correct result the application needs to wait for all replicas,
 which can result in latency problems if one of the replicas is slow.
-As :cite{style=name; Guerraoui2016} observe, it is often useful to already start speculative execution from the first result,
+As :cite{Guerraoui2016; style=author} observe, it is often useful to already start speculative execution from the first result,
 as that result is likely to be correct, and we do not have to wait for slow replicas.
 Speculative execution can be handled transparently.
 When a not yet confirmed value arrives it is propagated similarly to a normal value, but new changes remain hidden to the external program.

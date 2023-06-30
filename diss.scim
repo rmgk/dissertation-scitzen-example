@@ -4,10 +4,13 @@ texTemplate = /templates/memoir.scim
 katexMacros = /templates/katex-macros
 author      = Ragnar Mogk
 pagestyle   = oneside
+style       = article
+
+:raw{tex=\frontmatter}
 
 :include{/Chapters/Preface.scim}
 
-:tableofcontents{}
+:raw{tex=\cleardoublepage \tableofcontents* \mainmatter}
 
 :include{/Chapters/Introduction.scim}
 

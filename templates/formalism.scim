@@ -1,6 +1,6 @@
 \documentclass[preview, 11pt, class=memoir]{standalone}
 
-:{xetex fonts}
+:{xetexFonts}
 
 % more advanced includes
 \usepackage{graphicx}

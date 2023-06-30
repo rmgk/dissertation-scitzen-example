@@ -36,18 +36,19 @@
 \end{titlingpage}
 "}
 
-``text
-  Ragnar Mogk:
-  A Programming Paradigm for Reliable Applications in a Decentralized Setting
-  Darmstadt, Technische Universität Darmstadt
-  Hochschulkennziffer: Darmstadt – D 17
-  Tag der Einreichung: 27.01.2021
-  Tag der mündlichen Prüfung: 10.03.2021
-  Jahr der Veröffentlichung auf TUprints: 2021
-  URN: urn:nbn:de:tuda-tuprints-194035
+```text
+	Ragnar Mogk:
+	A Programming Paradigm for Reliable Applications in a Decentralized Setting
+	Darmstadt, Technische Universität Darmstadt
+	Hochschulkennziffer: Darmstadt – D 17
+	Tag der Einreichung: 27.01.2021
+	Tag der mündlichen Prüfung: 10.03.2021
+	Jahr der Veröffentlichung auf TUprints: 2021
+	URN: urn:nbn:de:tuda-tuprints-194035
+	DOI: https://doi.org/10.26083/tuprints-00019403
 
-  Veröffentlicht unter CC BY-SA 4.0 International
-``
+	Veröffentlicht unter CC BY-SA 4.0 International
+```
 
 :raw{tex="\noindent{}"}:link{https://creativecommons.org/licenses/by-sa/4.0/}
 
@@ -57,29 +58,29 @@
 
 :break{}
 
-“Reliability can be purchased only at the price of simplicity” – :cite{style=name; DBLP:journals/cacm/Hoare69}.
+::quote
+	“Reliability can be purchased only at the price of simplicity” – :cite{DBLP:journals/cacm/Hoare69; style=author}.
+::
 
-``text
-  Said in the context proofs of program correctness that solve real problems, but are difficult to give for programs with complex designs.
-``
+Said in the context proofs of program correctness that solve real problems, but are difficult to give for programs with complex designs.
 
 :break{}
 
+::quote
+	“What would you tell your grandmother when she asks what you study?“ – :cite{Sergio; DBLP:books/aw/AbiteboulHV95}
 ::
-  “What would you tell your grandmother when she asks what you study?“ – :cite{Sergio; DBLP:books/aw/AbiteboulHV95}
 
-  Programming languages were conceived to make it easier for humans to provide instructions to the machines.
-  In the early days, computers essentially executed a sequence of instructions changing some internal state to compute an output.
-  Machines were big and slow, and many of us shared a single machine.
-  Languages were designed to take advantage of those machines.
-  However, the machines have changed.
-  They are small and fast, and each of us has many machines, they outnumber us by a quickly increasing amount.
-  Programming languages have not changed.
-  We still talk to machines as if they were big and slow, this makes it hard for the machines to execute programs efficiently, and makes it hard for us to express what we want.
-  The world has changed.
-  Applications must – above all else – become reliable.
-  In this thesis, we study how to talk about applications that interact with humans, and how to do so in a way that is both good for machines and for people.
-::
+Programming languages were conceived to make it easier for humans to provide instructions to the machines.
+In the early days, computers essentially executed a sequence of instructions changing some internal state to compute an output.
+Machines were big and slow, and many of us shared a single machine.
+Languages were designed to take advantage of those machines.
+However, the machines have changed.
+They are small and fast, and each of us has many machines, they outnumber us by a quickly increasing amount.
+Programming languages have not changed.
+We still talk to machines as if they were big and slow, this makes it hard for the machines to execute programs efficiently, and makes it hard for us to express what we want.
+The world has changed.
+Applications must – above all else – become reliable.
+In this thesis, we study how to talk about applications that interact with humans, and how to do so in a way that is both good for machines and for people.
 
 :break{}
 

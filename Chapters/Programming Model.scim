@@ -12,36 +12,36 @@ However, the model is designed to be independent of any concrete embedding langu
 # Syntax
 
 ::figure{label=fig:semantics:syntax}
-  ``{converter=tex; template=/templates/formalism.scim}
-    \begin{document}
-    \begin{alignat*}{2}
-    C ::= &\  (M; D | ... | D) &\mathit{Communication}\\
-    D ::= &\  \device{L}{Σ}   &\mathit{Device} \\
-    L ::= &\  \instore{t}{μ} \mid \instore{t}{μ} \tprop{A}{P}   &\mathit{Process}\\
-    v ::= &\  \fun{x}{t} \mid r \mid \unit \mid …  &\mathit{Value}\\
-    t ::=
-    &\ v \mid x \mid t\ t\mid   &\lambda\ \mathit{Term}\\
-    &\ r \mid{} \react{\overline{t}}{f} \mid \fold{t}{t}{f}  \mid \flatten{t} \mid \filter{t}{f} \mid &\mathit{Reactive} \\
-    & \evt{s} \mid \observe{t}{o} ∣ \access{t} \mid \fire{t}{t} &\mathit{Integration}
-    \end{alignat*}
-    \begin{alignat*}{2}
-    r & &\mathit{Reactives\ (locations)}
-    \\
-    s & &\mathit{Source\ definition}
-    \\
-    o & &\mathit{Observer\ definition}
-    \\
-    f &: (μ, \overline{r}) → v  &\mathit{User\textnormal{-}defined\ function}
-    \\
-    M &: r ↦ ((v × v) → v) &\mathit{Merge\ mapping}
-    \\
-    Σ &: r ↦ v   &\mathit{Snapshot}
-    \\
-    μ &: r ↦ (\inp{} ⊂ r, \vala{} \in v, \op{} \in f, \act{} ∈ f, \obs{} ⊂ o)   &\mathit{Local\ store}
-    \end{alignat*}
-    \end{document}
-  ``
-  Syntax of :{fr}.
+	```convert{template={/templates/formalism.scim}; tex={}}
+		\begin{document}
+		\begin{alignat*}{2}
+		C ::= &\  (M; D | ... | D) &\mathit{Communication}\\
+		D ::= &\  \device{L}{Σ}   &\mathit{Device} \\
+		L ::= &\  \instore{t}{μ} \mid \instore{t}{μ} \tprop{A}{P}   &\mathit{Process}\\
+		v ::= &\  \fun{x}{t} \mid r \mid \unit \mid …  &\mathit{Value}\\
+		t ::=
+		&\ v \mid x \mid t\ t\mid   &\lambda\ \mathit{Term}\\
+		&\ r \mid{} \react{\overline{t}}{f} \mid \fold{t}{t}{f}  \mid \flatten{t} \mid \filter{t}{f} \mid &\mathit{Reactive} \\
+		& \evt{s} \mid \observe{t}{o} ∣ \access{t} \mid \fire{t}{t} &\mathit{Integration}
+		\end{alignat*}
+		\begin{alignat*}{2}
+		r & &\mathit{Reactives\ (locations)}
+		\\
+		s & &\mathit{Source\ definition}
+		\\
+		o & &\mathit{Observer\ definition}
+		\\
+		f &: (μ, \overline{r}) → v  &\mathit{User\textnormal{-}defined\ function}
+		\\
+		M &: r ↦ ((v × v) → v) &\mathit{Merge\ mapping}
+		\\
+		Σ &: r ↦ v   &\mathit{Snapshot}
+		\\
+		μ &: r ↦ (\inp{} ⊂ r, \vala{} \in v, \op{} \in f, \act{} ∈ f, \obs{} ⊂ o)   &\mathit{Local\ store}
+		\end{alignat*}
+		\end{document}
+	```
+	Syntax of :{fr}.
 ::
 
 
@@ -56,17 +56,17 @@ The current process is lost when the device crashes, but the snapshot is persist
 Each :math{D_i} starts with an initial process :math{L_i} and an empty snapshot.
 
 ::figure{label=figure-model-evaluation_context}
-  ``{converter=tex; template=/templates/formalism.scim}
-    \begin{document}
-    \begin{alignat*}{2}
-    E ::=
-    &\mid [\cdot] \mid E\ t \mid v\ E \\
-    &\mid{} \react{(\overline{r}, E, \overline{t})}{f} \mid \fold{E}{t}{f} \mid \fold{r}{E}{f} \mid \filter{E}{f} \mid \flatten{E} \\
-    &\mid \evt{E} \mid \observe{E}{o} \mid \access{E} \mid \fire{E}{t} \mid \fire{r}{E}
-    \end{alignat*}
-    \end{document}
-  ``
-  Evaluation context.
+	```convert{template={/templates/formalism.scim}; tex={}}
+		\begin{document}
+		\begin{alignat*}{2}
+		E ::=
+		&\mid [\cdot] \mid E\ t \mid v\ E \\
+		&\mid{} \react{(\overline{r}, E, \overline{t})}{f} \mid \fold{E}{t}{f} \mid \fold{r}{E}{f} \mid \filter{E}{f} \mid \flatten{E} \\
+		&\mid \evt{E} \mid \observe{E}{o} \mid \access{E} \mid \fire{E}{t} \mid \fire{r}{E}
+		\end{alignat*}
+		\end{document}
+	```
+	Evaluation context.
 ::
 
 The evaluation of processes :math{L} models
@@ -99,41 +99,41 @@ We write :math{"μ(r).\vala{}"} to access the value :math{"\vala{}"} of reactive
 
 
 ::figure{label=fig:typing-rules; aliases=rule-Map,rule-Fold,rule-Flatten,rule-Choice,rule-Filter,rule-Source,rule-Observe}
-  ``{converter=tex; template=/templates/formalism.scim}
-    \begin{document}
-    \begin{mathpar}
-    \infer[Map]
-    {t_i : \type{Reactive[T_i]} \and f : \type{\overline{T} → R}}
-    {\react{\overline{t}}{f} : \type{Reactive[R]}}
-    \and
-    \infer[Fold]
-    {t : \type{Reactive[T]} \and t_0 : \type{R} \and f : \type{(R, T) → R}}
-    {\fold{t}{t_0}{f} : \type{Reactive[R]}}
-    \and
-    \infer[Flatten]
-    {t : \type{Reactive[Reactive[T]]}}
-    {\flatten{t} : \type{Reactive[T]}}
-    \and
-    % \infer[Choice]
-    % {t_1 : \type{Reactive[T]} \and t_2 : \type{Reactive[T]} }
-    % {\ror{t_1}{t_2} : \type{Reactive[T]}}
-    % \and
-    \infer[Filter]
-    {t : \type{Reactive[T]} \and f : \type{T → Boolean}}
-    {\filter{t}{f} : \type{Reactive[T]}}
-    \and
-    \infer[Source]
-    {s : \type{SourceDef[T]}}
-    {\evt{s} : \type{Reactive[T]}}
-    \and
-    \infer[Observe]
-    {t : \type{Reactive[T]} \and o : \type{ObserverDef[T]}}
-    {\observe{t}{o} : \type{Observer}}
-    \end{mathpar}
-    \end{document}
+	```convert{template={/templates/formalism.scim}; tex={}}
+		\begin{document}
+		\begin{mathpar}
+		\infer[Map]
+		{t_i : \type{Reactive[T_i]} \and f : \type{\overline{T} → R}}
+		{\react{\overline{t}}{f} : \type{Reactive[R]}}
+		\and
+		\infer[Fold]
+		{t : \type{Reactive[T]} \and t_0 : \type{R} \and f : \type{(R, T) → R}}
+		{\fold{t}{t_0}{f} : \type{Reactive[R]}}
+		\and
+		\infer[Flatten]
+		{t : \type{Reactive[Reactive[T]]}}
+		{\flatten{t} : \type{Reactive[T]}}
+		\and
+		% \infer[Choice]
+		% {t_1 : \type{Reactive[T]} \and t_2 : \type{Reactive[T]} }
+		% {\ror{t_1}{t_2} : \type{Reactive[T]}}
+		% \and
+		\infer[Filter]
+		{t : \type{Reactive[T]} \and f : \type{T → Boolean}}
+		{\filter{t}{f} : \type{Reactive[T]}}
+		\and
+		\infer[Source]
+		{s : \type{SourceDef[T]}}
+		{\evt{s} : \type{Reactive[T]}}
+		\and
+		\infer[Observe]
+		{t : \type{Reactive[T]} \and o : \type{ObserverDef[T]}}
+		{\observe{t}{o} : \type{Observer}}
+		\end{mathpar}
+		\end{document}
 
-  ``
-  Typing rules of reactives.
+	```
+	Typing rules of reactives.
 ::
 
 
@@ -169,42 +169,42 @@ Observers model how data is extracted from the calculus and passed to some exter
 
 
 ::figure{label=fig:auxiliary-functions}
-  ``{converter=tex; template=/templates/formalism.scim}
-    \begin{document}
-    \begin{align*}
-    lookup(r, Σ, v) &= \begin{cases}
-    Σ(r) & r \in Σ \\
-    v & r \not\in Σ \\
-    \end{cases}
-    \\
-    \readyp{P}{μ} &= \{r \in μ ∣ r\not\in P \wedge \inputs{r, μ} \subseteq P \cup \{r\}\}
-    \\
-    \outdatedp{A, μ} &= \{r \in μ ∣ A  ∩ \inputs{r, μ} ≠ ∅ \}
-    \\
-    \reevexp{r, μ} &= μ(r).op(μ, \inputs{r, μ})
-    \\
-    \filterexp{r, μ} &= μ(r).\act(μ, \inputs{r, μ})
-    \\
-    \massign{μ}{r}{v} &= (μ, r ↦ (μ(r).\inp{}, v, μ(r).\op{}, μ(r).\act{}, μ(r).\obs{}))
-    \\
-    \inputs{r, μ} &= \begin{cases}
-    \{r₀, μ(r₀).\vala{}\} & μ(r).in = dynamic(r₀) \\
-    μ(r).in & \text{otherwise}\\
-    \end{cases}
-    \\
-    \stateful{r, μ} &= (r \in μ(r).in ∨ μ(r).in = ∅)
-    \\
-    \mathit{flatten}(μ, r) &= μ(μ(r).\vala).\vala
-    \\
-    \locationp{μ} &= \text{fresh location in $μ$, consistent between restarts}
-    \\
-    \extsourcesp{r} &= \text{source r is triggered externally}
-    \\
-    \extobservep{A, μ} &= \text{execute all external observers $\{o ∈ μ(r).\obs{} ∣ r ∈ A\}$}
-    \end{align*}
-    \end{document}
-  ``
-  Auxiliary functions for the operational semantics.
+	```convert{template={/templates/formalism.scim}; tex={}}
+		\begin{document}
+		\begin{align*}
+		lookup(r, Σ, v) &= \begin{cases}
+		Σ(r) & r \in Σ \\
+		v & r \not\in Σ \\
+		\end{cases}
+		\\
+		\readyp{P}{μ} &= \{r \in μ ∣ r\not\in P \wedge \inputs{r, μ} \subseteq P \cup \{r\}\}
+		\\
+		\outdatedp{A, μ} &= \{r \in μ ∣ A  ∩ \inputs{r, μ} ≠ ∅ \}
+		\\
+		\reevexp{r, μ} &= μ(r).op(μ, \inputs{r, μ})
+		\\
+		\filterexp{r, μ} &= μ(r).\act(μ, \inputs{r, μ})
+		\\
+		\massign{μ}{r}{v} &= (μ, r ↦ (μ(r).\inp{}, v, μ(r).\op{}, μ(r).\act{}, μ(r).\obs{}))
+		\\
+		\inputs{r, μ} &= \begin{cases}
+		\{r₀, μ(r₀).\vala{}\} & μ(r).in = dynamic(r₀) \\
+		μ(r).in & \text{otherwise}\\
+		\end{cases}
+		\\
+		\stateful{r, μ} &= (r \in μ(r).in ∨ μ(r).in = ∅)
+		\\
+		\mathit{flatten}(μ, r) &= μ(μ(r).\vala).\vala
+		\\
+		\locationp{μ} &= \text{fresh location in $μ$, consistent between restarts}
+		\\
+		\extsourcesp{r} &= \text{source r is triggered externally}
+		\\
+		\extobservep{A, μ} &= \text{execute all external observers $\{o ∈ μ(r).\obs{} ∣ r ∈ A\}$}
+		\end{align*}
+		\end{document}
+	```
+	Auxiliary functions for the operational semantics.
 ::
 
 # Semantics Overview
@@ -229,33 +229,33 @@ We make the usual fairness assumptions that eventually all devices get the chanc
 
 
 ::figure{label=fig:formalization:devices; aliases=rule-firetx,rule-commit,rule-access,rule-outer,rule-context}
-  ``{converter=tex; template=/templates/formalism.scim}
-    \begin{document}
-    \raggedright
-    $\boxed{→_D \subset D × D}$
-    \vspace{-5mm}
-    \begin{mathpar}
-    \infer{ μ(r).in = ∅}
-      {\ndevice{Σ}{μ}{\fire{r}{v}}  →_D
-       \devprop{Σ}{ \massign{μ}{r}{v} }{r}{ \{r\} }{ \{r\} }   } \named{firetx}
-    %
-    \infer{P = \dom{μ} \and \extobservep{A, μ} \\\\ Σ' = Σ, {\{
-    r ↦ μ(r).\vala{}
-    \mid r \in A ∧ \stateful{μ, r}\}}}
-    { \device{ \crp{}{μ}{{\prop{A}{P}}} }{{Σ}} →_D \device{ \crp{}{μ}{} }{{Σ'}} }
-    \named{commit}
-    %
-    \infer{ {v = μ(r).\vala{}} }
-      {\device{\crp{{\access{r}}}{μ}{}}{Σ} →_D \device{\crp{{v}}{μ}{}}{Σ} } \named{access}
-    %
-    \infer{{t →_\lambda t'}}{\device{\crp{{t}}{μ}{}}{} →_D  \device{\crp{{t'}}{μ}{}}{}} \named{outer}
-    %
-    \infer{\device{\rp{{t}}{{μ}}{}}{} →_D  \device{\rp{{t'}}{{μ'}}{}}{}}
-          {\device{\rp{{E[t]}}{{μ}}{}}{} →_D  \device{\rp{{E[t']}}{{μ'}}{}}{}} \named{context}
-    \end{mathpar}
-    \end{document}
-  ``
-  Operational semantics for process behavior of devices.
+	```convert{template={/templates/formalism.scim}; tex={}}
+		\begin{document}
+		\raggedright
+		$\boxed{→_D \subset D × D}$
+		\vspace{-5mm}
+		\begin{mathpar}
+		\infer{ μ(r).in = ∅}
+		  {\ndevice{Σ}{μ}{\fire{r}{v}}  →_D
+		   \devprop{Σ}{ \massign{μ}{r}{v} }{r}{ \{r\} }{ \{r\} }   } \named{firetx}
+		%
+		\infer{P = \dom{μ} \and \extobservep{A, μ} \\\\ Σ' = Σ, {\{
+		r ↦ μ(r).\vala{}
+		\mid r \in A ∧ \stateful{μ, r}\}}}
+		{ \device{ \crp{}{μ}{{\prop{A}{P}}} }{{Σ}} →_D \device{ \crp{}{μ}{} }{{Σ'}} }
+		\named{commit}
+		%
+		\infer{ {v = μ(r).\vala{}} }
+		  {\device{\crp{{\access{r}}}{μ}{}}{Σ} →_D \device{\crp{{v}}{μ}{}}{Σ} } \named{access}
+		%
+		\infer{{t →_\lambda t'}}{\device{\crp{{t}}{μ}{}}{} →_D  \device{\crp{{t'}}{μ}{}}{}} \named{outer}
+		%
+		\infer{\device{\rp{{t}}{{μ}}{}}{} →_D  \device{\rp{{t'}}{{μ'}}{}}{}}
+		      {\device{\rp{{E[t]}}{{μ}}{}}{} →_D  \device{\rp{{E[t']}}{{μ'}}{}}{}} \named{context}
+		\end{mathpar}
+		\end{document}
+	```
+	Operational semantics for process behavior of devices.
 ::
 
 
@@ -325,45 +325,45 @@ label = sec:semantics:reactive-language-overview
 
 
 ::figure{label=fig:formalization:creating-reactives; aliases=rule-source,rule-map,rule-fold,rule-flatten,rule-filter,rule-observe}
-  ``figure{converter=tex; template=/templates/formalism.scim}
-    \begin{document}
-    \raggedright
-    $\boxed{→_D \subset D × D}$
-    \vspace{-3mm}
-    \begin{mathpar}
-    \infer{\makeloc{r₀}{μ} \\ {v_s = lookup(r₀, Σ, v)}
-    \\\\ μ' = μ, r₀ ↦ (∅, {v_s}, \unit{}, ∅, \sigact{}) }
-    { \ndevice{Σ}{μ}{ \evt{v} } →_D   \ndevice{(Σ, {r₀ ↦ v_s})}{μ'}{r} }
-    \named{source}
-    %
-    \infer{\makeloc{r₀}{μ}
-    \\ μ' = μ, {r₀ ↦ (\{\overline{r}\}, f(μ, \overline{r}), f, ∅, \sigact{})}  }
-    {\ndevice{Σ}{μ}{\react{\overline{r}}{f}} →_D    \devprop{Σ}{μ'}{r₀}{\{r₀\}}{\{r₀\}}  }
-    \named{map}
-    %
-    \infer{\makeloc{r₀}{μ} \\ {v_s = lookup(r₀, Σ, v)}
-    \\\\ μ' = μ, r₀ ↦ (\{r₀, r₁\}, {v_s}, f, ∅, \sigact{}) }
-    { \ndevice{Σ}{μ}{\fold{r₁}{v}{f}}  →_D   \ndevice{(Σ, r₀ ↦ v_s)}{μ'}{r₀} }
-    \named{fold}
-    %
-    \infer{\makeloc{r}{μ}
-    \\\\ μ' = (μ, r₀ ↦ (\dynamic{r₁}, \mathit{flatten}(μ, r₁), \mathit{flatten}, ∅, \sigact{}))}
-    {\ndevice{Σ}{μ}{\flatten{r₁}}  →_D   \ndevice{Σ}{μ'}{r₀} }
-    \named{flatten}
-    %
-    \infer{\makeloc{r₀}{μ}
-    \\ μ' = μ, {r₀ ↦ (\{r₁\}, μ({r₁}).\vala{}, \mathit{identity}, ∅, f)}  }
-    {\ndevice{Σ}{μ}{\filter{r₁}{f}} →_D    \ndevice{Σ}{μ'}{r₀}  }
-    \named{filter}
-    %
-    \infer{\makeloc{r₀}{μ}
-    \\ μ' = μ, {r₀ ↦ (\{r₁\}, μ({r₁}).\vala{}, \mathit{identity}, \{o\}, \sigact{})}  }
-    {\ndevice{Σ}{μ}{\observe{r₁}{o}} →_D    \ndevice{Σ}{μ'}{unit}  }
-    \named{observe}
-    \end{mathpar}
-    \end{document}
-  ``
-  Operational semantics for creating reactives.
+	```convert{template={/templates/formalism.scim}; tex={}}
+		\begin{document}
+		\raggedright
+		$\boxed{→_D \subset D × D}$
+		\vspace{-3mm}
+		\begin{mathpar}
+		\infer{\makeloc{r₀}{μ} \\ {v_s = lookup(r₀, Σ, v)}
+		\\\\ μ' = μ, r₀ ↦ (∅, {v_s}, \unit{}, ∅, \sigact{}) }
+		{ \ndevice{Σ}{μ}{ \evt{v} } →_D   \ndevice{(Σ, {r₀ ↦ v_s})}{μ'}{r} }
+		\named{source}
+		%
+		\infer{\makeloc{r₀}{μ}
+		\\ μ' = μ, {r₀ ↦ (\{\overline{r}\}, f(μ, \overline{r}), f, ∅, \sigact{})}  }
+		{\ndevice{Σ}{μ}{\react{\overline{r}}{f}} →_D    \devprop{Σ}{μ'}{r₀}{\{r₀\}}{\{r₀\}}  }
+		\named{map}
+		%
+		\infer{\makeloc{r₀}{μ} \\ {v_s = lookup(r₀, Σ, v)}
+		\\\\ μ' = μ, r₀ ↦ (\{r₀, r₁\}, {v_s}, f, ∅, \sigact{}) }
+		{ \ndevice{Σ}{μ}{\fold{r₁}{v}{f}}  →_D   \ndevice{(Σ, r₀ ↦ v_s)}{μ'}{r₀} }
+		\named{fold}
+		%
+		\infer{\makeloc{r}{μ}
+		\\\\ μ' = (μ, r₀ ↦ (\dynamic{r₁}, \mathit{flatten}(μ, r₁), \mathit{flatten}, ∅, \sigact{}))}
+		{\ndevice{Σ}{μ}{\flatten{r₁}}  →_D   \ndevice{Σ}{μ'}{r₀} }
+		\named{flatten}
+		%
+		\infer{\makeloc{r₀}{μ}
+		\\ μ' = μ, {r₀ ↦ (\{r₁\}, μ({r₁}).\vala{}, \mathit{identity}, ∅, f)}  }
+		{\ndevice{Σ}{μ}{\filter{r₁}{f}} →_D    \ndevice{Σ}{μ'}{r₀}  }
+		\named{filter}
+		%
+		\infer{\makeloc{r₀}{μ}
+		\\ μ' = μ, {r₀ ↦ (\{r₁\}, μ({r₁}).\vala{}, \mathit{identity}, \{o\}, \sigact{})}  }
+		{\ndevice{Σ}{μ}{\observe{r₁}{o}} →_D    \ndevice{Σ}{μ'}{unit}  }
+		\named{observe}
+		\end{mathpar}
+		\end{document}
+	```
+	Operational semantics for creating reactives.
 ::
 
 The reduction rules in :ref{Figure; fig:formalization:creating-reactives}
@@ -424,32 +424,32 @@ Removing any combination of those four from the calculus still provides a useful
 For example, removing filter essentially removes event semantics, removing fold results in stateless applications (except sources), and removing flatten makes :{flowgraph}s static.
 
 ::figure{label=fig:dataflow-graph-formalism-example}
-  ``image{converter=tex; template=/templates/formalism.scim}
-    \newcommand{\storeex}[3]{(\{#1\}, \texttt{\small#2}, \texttt{\small#3}, ∅, true)}
-    \newcommand{\sourceex}[1]{(∅, \texttt{\small#1}, \unit, ∅, true)}
-    \begin{document}
-    \begin{alignat*}{2}
-    μ = &( \\
-    \locm{name} ↦&\  \sourceex{"some name"}, \\
-    \locm{text} ↦&\  \sourceex{"some message"}, \\
-    \locm{message} ↦&\  \{\locm{name}, \locm{text}\}, \texttt{"some name: some message"}, \\
-     \phantom{↦}&\  \texttt{(n, i) => n + ": " + i}, ∅, true), \\
-    \locm{room1} ↦&\  \storeex{\locm{room1}, \locm{message}}{Nil}{(history, msg) => msg :: history}, \\
-    \locm{room2} ↦&\  \sourceex{List(”Me: a constant message”)}, \\
-    \locm{roomList} ↦&\  \sourceex{(\locn{room1}, \locn{room2})}, \\
-    \locm{index} ↦&\  \sourceex{0}, \\
-    \locm{selectedRoom} ↦&\  \storeex{\locm{roomList}, \locm{index}}{\locn{room1}}{(l, n) => l(n)}, \\
-    \locm{roomContent} ↦&\  \storeex{\dynamic{\locm{selectedRoom}}}{Nil}{unit} \\
-    &)
-    \end{alignat*}
-    \end{document}
-  ``
-  :% ``
-  :%   val contentWidget = §\locn{roomContent}§.Map {content => listWidget (content)}
-  :%   displayUI(§\locn{name}§, §\locn{text}§, contentWidget)
-  :% ``
+	```convert{template={/templates/formalism.scim}; tex={}}
+		\newcommand{\storeex}[3]{(\{#1\}, \texttt{\small#2}, \texttt{\small#3}, ∅, true)}
+		\newcommand{\sourceex}[1]{(∅, \texttt{\small#1}, \unit, ∅, true)}
+		\begin{document}
+		\begin{alignat*}{2}
+		μ = &( \\
+		\locm{name} ↦&\  \sourceex{"some name"}, \\
+		\locm{text} ↦&\  \sourceex{"some message"}, \\
+		\locm{message} ↦&\  \{\locm{name}, \locm{text}\}, \texttt{"some name: some message"}, \\
+		 \phantom{↦}&\  \texttt{(n, i) => n + ": " + i}, ∅, true), \\
+		\locm{room1} ↦&\  \storeex{\locm{room1}, \locm{message}}{Nil}{(history, msg) => msg :: history}, \\
+		\locm{room2} ↦&\  \sourceex{List(”Me: a constant message”)}, \\
+		\locm{roomList} ↦&\  \sourceex{(\locn{room1}, \locn{room2})}, \\
+		\locm{index} ↦&\  \sourceex{0}, \\
+		\locm{selectedRoom} ↦&\  \storeex{\locm{roomList}, \locm{index}}{\locn{room1}}{(l, n) => l(n)}, \\
+		\locm{roomContent} ↦&\  \storeex{\dynamic{\locm{selectedRoom}}}{Nil}{unit} \\
+		&)
+		\end{alignat*}
+		\end{document}
+	```
+	:% ``
+	:%   val contentWidget = §\locn{roomContent}§.Map {content => listWidget (content)}
+	:%   displayUI(§\locn{name}§, §\locn{text}§, contentWidget)
+	:% ``
 
-  Example of the store after evaluating the chat example up to constructing the content widget.
+	Example of the store after evaluating the chat example up to constructing the content widget.
 ::
 
 
@@ -497,29 +497,29 @@ are either reevaluated or skipped, until all reactives are processed.
 
 
 ::figure{label=fig:formalization:propagation; aliases=rule-skip,rule-reevaluate,rule-inner,rule-write}
-  ``image{converter=tex; template=/templates/formalism.scim}
-    \begin{document}
-    \raggedright
-    $\boxed{→_p \subset D × D}$
-    \vspace{-5mm}
-    \begin{mathpar}
-    \infer{{\ready{P}{μ}{r} \and \noutdated{A, μ}{r}}}
-    {\devprop{Σ}{μ}{t}{A}{P}  \stp{r} \devprop{Σ}{μ}{t}{A}{P,r} }
-    \named{skip}
-    %
-    \infer{ \ready{P}{μ}{r} \and \outdated{A, μ}{r} \and v = \reevexp{r, μ}
-    \\ A' = A, r \ \text{if} \ \filterexp{r, μ};\ A\ \text{otherwise} }
-    { \devprop{Σ}{μ}{t}{A}{P}  \stp{r} \devprop{Σ}{\massign{μ}{r}{v}}{t}{A'}{P,r} }
-    \named{reevaluate}
-    %
-    %\infer{{t →_\lambda t'}}
-    %{ \device{\crp{}{μ}{{t} \cdot r \cdot \prop{A}{P}}}{} \stp{r} \device{\crp{}{μ}{{t'} \cdot r \cdot \prop{A}{P}}}{} } \named{inner}
-    %
-    %\infer{ } { \device{\crp{}{μ}{{v \cdot r} \cdot \prop{A}{P}}}{}   \stp{r}   \device{\crp{}{\massign{μ}{r}{v}}{\prop{A}{P}}}{} } \named{write}
-    \end{mathpar}
-    \end{document}
-  ``
-  Operational semantics for propagation and reevaluation.
+	```convert{template={/templates/formalism.scim}; tex={}}
+		\begin{document}
+		\raggedright
+		$\boxed{→_p \subset D × D}$
+		\vspace{-5mm}
+		\begin{mathpar}
+		\infer{{\ready{P}{μ}{r} \and \noutdated{A, μ}{r}}}
+		{\devprop{Σ}{μ}{t}{A}{P}  \stp{r} \devprop{Σ}{μ}{t}{A}{P,r} }
+		\named{skip}
+		%
+		\infer{ \ready{P}{μ}{r} \and \outdated{A, μ}{r} \and v = \reevexp{r, μ}
+		\\ A' = A, r \ \text{if} \ \filterexp{r, μ};\ A\ \text{otherwise} }
+		{ \devprop{Σ}{μ}{t}{A}{P}  \stp{r} \devprop{Σ}{\massign{μ}{r}{v}}{t}{A'}{P,r} }
+		\named{reevaluate}
+		%
+		%\infer{{t →_\lambda t'}}
+		%{ \device{\crp{}{μ}{{t} \cdot r \cdot \prop{A}{P}}}{} \stp{r} \device{\crp{}{μ}{{t'} \cdot r \cdot \prop{A}{P}}}{} } \named{inner}
+		%
+		%\infer{ } { \device{\crp{}{μ}{{v \cdot r} \cdot \prop{A}{P}}}{}   \stp{r}   \device{\crp{}{\massign{μ}{r}{v}}{\prop{A}{P}}}{} } \named{write}
+		\end{mathpar}
+		\end{document}
+	```
+	Operational semantics for propagation and reevaluation.
 ::
 
 
@@ -550,36 +550,36 @@ Because both sets, active reactives :math{A} and processed reactives :math{P}, o
 
 
 ::figure{label=fig:formalization:state-remote; aliases=rule-device,rule-synchronizetx,rule-sourcetx,rule-*tx}
-  ``image{converter=tex; template=/templates/formalism.scim}
-    \begin{document}
-    \raggedright
-    $\boxed{→_C \subset C × C}$
-    \vspace{-5mm}
-    \begin{mathpar}
-    \infer{{D_i →_D D_i'}}
-    {(M; D_1 | ... |{D_i}| ... | D_n)  →_C (M; D_1 | ... |{D_i'}| ... | D_n)  }
-    \named{device}
-    %
-    \infer{ v = \extsourcesp{r} \\
-    D' = \devprop{Σ}{ \massign{μ}{r}{v} }{t}{ \{r\} }{ \{r\} } }
-      {(M; D_1 | ... | \ndevice{Σ}{μ}{t} | ... | D_n) →_C
-       (M; D_1 | ... | D' | ... | D_n)   } \named{sourcetx}
-    %
-    \infer{
-      \overline{r} = \mathit{dom}(μ_s) ∩ \mathit{dom}(M)
-      \\ \mathit{merge}_i = M(r_i)
-      \\\\ v_i = \mathit{merge_i}(μ_s(r_i).\vala{}, μ_r(r_i).\vala{})
-      \\\\ D_s = \ndevice{Σ_s}{μ_s}{t_s} \\ D_r = \ndevice{Σ_r}{μ_r}{t_r}
-      \\ A = \{r_i ∣ μ_r(r_i).\vala{} ≠ v_i \}
-      \\\\ D_r' = \devprop{Σ_r}{\massign{μ_r}{r_i}{v_i}}{t_r}{A}{A}
-    }
-    {(M; D_1 | ... | D_s | ...| D_r  |... | D_n) →_C
-    (M; D_1 | ... | D_s | ...| D_r' |... | D_n)   }
-    \named{synchronizetx}
-    \end{mathpar}
-    \end{document}
-  ``
-  Operational semantics for remote updates.
+	```convert{template={/templates/formalism.scim}; tex={}}
+		\begin{document}
+		\raggedright
+		$\boxed{→_C \subset C × C}$
+		\vspace{-5mm}
+		\begin{mathpar}
+		\infer{{D_i →_D D_i'}}
+		{(M; D_1 | ... |{D_i}| ... | D_n)  →_C (M; D_1 | ... |{D_i'}| ... | D_n)  }
+		\named{device}
+		%
+		\infer{ v = \extsourcesp{r} \\
+		D' = \devprop{Σ}{ \massign{μ}{r}{v} }{t}{ \{r\} }{ \{r\} } }
+		  {(M; D_1 | ... | \ndevice{Σ}{μ}{t} | ... | D_n) →_C
+		   (M; D_1 | ... | D' | ... | D_n)   } \named{sourcetx}
+		%
+		\infer{
+		  \overline{r} = \mathit{dom}(μ_s) ∩ \mathit{dom}(M)
+		  \\ \mathit{merge}_i = M(r_i)
+		  \\\\ v_i = \mathit{merge_i}(μ_s(r_i).\vala{}, μ_r(r_i).\vala{})
+		  \\\\ D_s = \ndevice{Σ_s}{μ_s}{t_s} \\ D_r = \ndevice{Σ_r}{μ_r}{t_r}
+		  \\ A = \{r_i ∣ μ_r(r_i).\vala{} ≠ v_i \}
+		  \\\\ D_r' = \devprop{Σ_r}{\massign{μ_r}{r_i}{v_i}}{t_r}{A}{A}
+		}
+		{(M; D_1 | ... | D_s | ...| D_r  |... | D_n) →_C
+		(M; D_1 | ... | D_s | ...| D_r' |... | D_n)   }
+		\named{synchronizetx}
+		\end{mathpar}
+		\end{document}
+	```
+	Operational semantics for remote updates.
 ::
 
 
@@ -656,7 +656,7 @@ We can do so without loss of generality by assuming that the transformation expl
 
 
 :% ::figure{label=fig:formalization:operational-lambda-calculus-with-errors}
-:%   ``{converter=tex; template=/templates/formalism.scim}
+:%   ``convert{template={/templates/formalism.scim}; tex={}}
 :%     \begin{document}
 :%     \begin{mathpar}
 :%     \infer{ t →_\lambda t'}{ E[t] →_\lambda E[t'] } \named{context}

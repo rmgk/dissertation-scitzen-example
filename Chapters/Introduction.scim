@@ -236,7 +236,7 @@ As a result of the declarative nature of the programming paradigm, our solution 
 label = definition-rescala
 
 {note=Reactive language as solution.}
-:{rescala} as discussed in this thesis is an extension of the core language design proposed by :cite{Salvaneschi2014; style=name}.
+:{rescala} as discussed in this thesis is an extension of the core language design proposed by :cite{Salvaneschi2014; style=author}.
 :{rescala} is a fault-tolerant reactive programming language for developing :{apps}.
 :{rescala} has first-class abstractions for
 :emph{events} and :emph{signals} that are concrete instances of reactives in the :{flowgraph}.
@@ -345,16 +345,16 @@ In addition, we added proofs for causal consistency that have not been published
 :ref{Chapter; chapter-project} bridges between the formal model and the actual implementation.
 This chapter provides the high-level explanation of the structure of the source code of :{rescala} and how the core packages of :{rescala} interact.
 The concepts are still the same as in the formalization, but the implementation has better modularity, enabling just parts of the system to be replaced.
-Only the description of ParRP in :ref{Section; section-implementation-parrp} is based on published work:cite{; Mogk2015ConcurrencyControlForRP}, but the collaboration with :cite{Drechsler:2018:TRP; style=name} was a strong driver for the design.
+Only the description of ParRP in :ref{Section; section-implementation-parrp} is based on published work:cite{; Mogk2015ConcurrencyControlForRP}, but the collaboration with :cite{Drechsler:2018:TRP; style=author} was a strong driver for the design.
 
 :ref{Chapter; chapter-errors_exceptions} introduces error propagation to :{rescala} and thus allows the programming paradigm to be embedded into languages that use exceptions – such as Scala.
 This extension is based in parts on work published at :cite{ECOOP; mogk_et_al:LIPIcs:2018:9206} but has been expanded to include a thorough discussion of alternative designs.
 
 :ref{Chapter; chapter-compilation} describes how the :{cvtr} paradigm can be ahead-of-time compiled to enable the use of the paradigm on embedded devices.
-This work is based on the collaboration with :cite{Sterz2020ReacfiFi; style=name} to which the compiler and language design was my contribution.
+This work is based on the collaboration with :cite{Sterz2020ReacfiFi; style=author} to which the compiler and language design was my contribution.
 
 :ref{Chapter; chapter-live_tuning} shows the flexibility of :{rescala} by enabling debugging and a limited form of live programming we call live tuning.
-The original implementation of the debugger was done by :cite{Salvaneschi:2016:DRP:2884781.2884815; style=name} but I contributed the support for the debugger in :{rescala}.
+The original implementation of the debugger was done by :cite{Salvaneschi:2016:DRP:2884781.2884815; style=author} but I contributed the support for the debugger in :{rescala}.
 I also contributed the modified version of the debugger supporting live tuning published at the Live workshop:cite{; Mogk:2018:DTL} which this chapter is based on.
 
 :ref{Chatper; chapter-crdts} discusses alternatives and extensions to the replication model that has been introduced in the first part of the thesis.
@@ -362,14 +362,14 @@ In particular, this chapter discusses the challenges faced by alternative soluti
 Yet, using this analysis we can take many of the advantages of existing ongoing research and apply those to :{cvtr}.
 
 :ref{Chapter; chapter-case_studies} describes several case studies.
-This chapter includes a case study from the collaboration with :cite{Baumgaertner:2019:SSL; style=name}.
+This chapter includes a case study from the collaboration with :cite{Baumgaertner:2019:SSL; style=author}.
 I contributed the implementation and the description of that case study as found in this chapter.
 
 :ref{Chapter; chapter-programming_experience} summarizes our experience with programming using :{rescala} and some similar languages and was first published at the programming experience workshop:cite{; Mogk:2018:RPE}.
 The chapter argues why :{rescala} is such a promising approach to developing :{apps} even when not worrying about faults and contrast various alternative approaches and their shortcomings.
 
 :ref{Chapter; chapter-microbenchmarks} provides performance experiments using :{rescala}.
-This chapter includes reasoning and evaluation that were done in the context of the collaboration with :cite{style=name; Drechsler2014,Drechsler:2018:TRP}, but the content in the form presented here has never been published before.
+This chapter includes reasoning and evaluation that were done in the context of the collaboration with :cite{Drechsler2014,Drechsler:2018:TRP; style=author}, but the content in the form presented here has never been published before.
 
 :ref{Chapter; chapter-related_work} discusses related work. We try to use this opportunity to provide the historic context of the research areas that have influenced our work and that we build on.
 The content is an aggregation of pieces published before, but all the text of the pieces and the resulting overall discussion are entirely my own work.
@@ -382,35 +382,35 @@ The full list of publications is as follows.
 All publications have been peer reviewed, though not all of the venues provide a formal publication process.
 The publications are sorted by year ascending.
 
-:raw{tex={ \sloppy \defaultlists}
+:raw{tex="{ \sloppy \defaultlists"}
 
 ## Conference and Journal Publications
 
-. :cite{style=inline; Drechsler2014}.
-. :cite{style=inline; Sterz:2017:DTN}.
-. :cite{style=inline; Drechsler:2018:TRP} (Conceptual relations to parts of :ref{Chapter; chapter-project} and :ref{Chapter; chapter-microbenchmarks}).
-. :cite{style=inline; mogk_et_al:LIPIcs:2018:9206} (Chapters :ref{chapter-demonstration}, :ref{chapter-resilient_state}, and :ref{chapter-errors_exceptions}).
-. :cite{style=inline; Mogk:2019:FPM} (Chapters :ref{chapter-programming_model} and :ref{chapter-formalization}).
-. :cite{style=inline; Baumgaertner:2019:SSL}
+1. :cite{style=inline; Drechsler2014}.
+2. :cite{style=inline; Sterz:2017:DTN}.
+3. :cite{style=inline; Drechsler:2018:TRP} (Conceptual relations to parts of :ref{Chapter; chapter-project} and :ref{Chapter; chapter-microbenchmarks}).
+4. :cite{style=inline; mogk_et_al:LIPIcs:2018:9206} (Chapters :ref{chapter-demonstration}, :ref{chapter-resilient_state}, and :ref{chapter-errors_exceptions}).
+5. :cite{style=inline; Mogk:2019:FPM} (Chapters :ref{chapter-programming_model} and :ref{chapter-formalization}).
+6. :cite{style=inline; Baumgaertner:2019:SSL}
   (:ref{Chapter; chapter-case_studies}).
-. :cite{style=inline; Sterz2020ReacfiFi}
+7. :cite{style=inline; Sterz2020ReacfiFi}
   (:ref{Chapter; chapter-compilation}).
 
 ## Workshop Publications
 
-. :cite{style=inline; Mogk:2015:RI}.
-. :cite{style=inline; Mogk:2018:RPE}.
+1. :cite{style=inline; Mogk:2015:RI}.
+2. :cite{style=inline; Mogk:2018:RPE}.
   (:ref{Chapter; chapter-programming_experience}).
-. :cite{style=inline; Mogk:2018:DTL}
+3. :cite{style=inline; Mogk:2018:DTL}
   (:ref{Chapter; chapter-live_tuning}).
-. :cite{style=inline; Richter:2019:TUU}.
+4. :cite{style=inline; Richter:2019:TUU}.
 
 ## Abstracts, Posters, and Demos
 
-. :cite{style=inline; Mogk2015ConcurrencyControlForRP}
+1. :cite{style=inline; Mogk2015ConcurrencyControlForRP}
 (:ref{Section; section-implementation-parrp}).
-. :cite{style=inline; Meurisch:2017:DisVis}.
-. :cite{style=inline; Mogk:2017:PDRP}.
+2. :cite{style=inline; Meurisch:2017:DisVis}.
+3. :cite{style=inline; Mogk:2017:PDRP}.
 
 :raw{tex="}"}
 

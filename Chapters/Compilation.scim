@@ -29,9 +29,9 @@ We call this reduced subset of the calculus :{reactifi} – named after the firs
 :{reactifi} uses the C programming language for user-defined functions, but uses the actual calculus for the embedding language – in contrast, :{rescala} uses Scala for both the embedding and for user-defined functions.
 
 ::figure{label=fig:compilation-stages}
-  :image{/Figures/System/reactifi-pipeline.pdf}
+	:image{/Figures/System/reactifi-pipeline.pdf}
 
-  Stages of compiling :{reactifi} to Wi-Fi chips.
+	Stages of compiling :{reactifi} to Wi-Fi chips.
 ::
 
 A :{reactifi} program is processed in four steps (:ref{Figure; fig:compilation-stages}): (i) an interpreter executes the :{reactifi} program to construct the :{flowgraph}, (ii) the compiler compiles the :{flowgraph} into a C program that represents a sequential execution of the change propagation discussed in :ref{Chapter; chapter-programming_model}, (iii) the C source code is compiled into a binary, which (iv) is loaded to the Wi-Fi chip and linked into the firmware at runtime.
@@ -51,41 +51,41 @@ We then discuss those optimizations separately in :ref{Section; section-generati
 # Compiling Individual Reactives
 
 ::figure{label=fig-compiler-semantics}
-  ``{converter=tex; template=/templates/formalism.scim}
-    \begin{document}
-    \begin{align*}
-    \compile{\vx{} \react{\overline{x}}{f}} =&
-    \ccond{\trigger{\overline{x}}} {x_0 = \compile{f(\overline{x})}}
-    \\
-    \compile{\vx{} \fold{x}{v}{f}} =&
-    \ccond{\trigger{x}} {x_0 = \compile{f(x_0, x)}}
-    \\
-    % \compile{\vx{} \foldn{}(v)(x \rightarrow f)} =&
-    % \ccond{\trigger{x}} {x_0 = \compile{f(x_0, x)}}
-    % \\
-    % \compile{\vx{} \foldn{}(v)(x_1 \rightarrow f_1, \overline{x \rightarrow f})} =&
-    % \ccond{\trigger{x_1}} {x_0 = \compile{f_1(x_0, x_1)}};
-    % \\& \compile{\vx{} \foldn{}(v)(\overline{x \rightarrow f})}
-    % \\
-    \compile{\vx{} \filter{x}{f}} =&
-    \ccond{ \trigger{x} \&\& \compile{f(x)} } {x_{0f} = \sigact{}; x_0 = \compile{x}}
-    \\
-    \compile{\vx{} \evt{s}} =&
-    \ccond{\trigger{s}} {x_0 = \compile{s}}
-    \\
-    \compile{\vx{} \compile{\observe{\overline{x}}{o}}} =&
-    \ccond{\trigger{\overline{x}}} {\compile{o(\overline{x})}}
-    \\
-    \compile{\vx{} \ror{x_1}{x_2}} =&
-    \ccond{ \trigger{x_1}} {x_0 = \compile{x_1}}
-    \\& \celse{\ccond{\trigger{x_2}} {x_0 = \compile{x_2}} }
-    \\
-    \compile{\vx{} \snapshot{x_1}{x_2}} =&
-    \ccond{\trigger{x_1}} {x_0 = \compile{x_2}}
-    \end{align*}
-    \end{document}
-  ``
-  Compiling individual :{reactifi} reactives (left) to C code (right).
+	```convert{template={/templates/formalism.scim}; tex={}}
+		\begin{document}
+		\begin{align*}
+		\compile{\vx{} \react{\overline{x}}{f}} =&
+		\ccond{\trigger{\overline{x}}} {x_0 = \compile{f(\overline{x})}}
+		\\
+		\compile{\vx{} \fold{x}{v}{f}} =&
+		\ccond{\trigger{x}} {x_0 = \compile{f(x_0, x)}}
+		\\
+		% \compile{\vx{} \foldn{}(v)(x \rightarrow f)} =&
+		% \ccond{\trigger{x}} {x_0 = \compile{f(x_0, x)}}
+		% \\
+		% \compile{\vx{} \foldn{}(v)(x_1 \rightarrow f_1, \overline{x \rightarrow f})} =&
+		% \ccond{\trigger{x_1}} {x_0 = \compile{f_1(x_0, x_1)}};
+		% \\& \compile{\vx{} \foldn{}(v)(\overline{x \rightarrow f})}
+		% \\
+		\compile{\vx{} \filter{x}{f}} =&
+		\ccond{ \trigger{x} \&\& \compile{f(x)} } {x_{0f} = \sigact{}; x_0 = \compile{x}}
+		\\
+		\compile{\vx{} \evt{s}} =&
+		\ccond{\trigger{s}} {x_0 = \compile{s}}
+		\\
+		\compile{\vx{} \compile{\observe{\overline{x}}{o}}} =&
+		\ccond{\trigger{\overline{x}}} {\compile{o(\overline{x})}}
+		\\
+		\compile{\vx{} \ror{x_1}{x_2}} =&
+		\ccond{ \trigger{x_1}} {x_0 = \compile{x_1}}
+		\\& \celse{\ccond{\trigger{x_2}} {x_0 = \compile{x_2}} }
+		\\
+		\compile{\vx{} \snapshot{x_1}{x_2}} =&
+		\ccond{\trigger{x_1}} {x_0 = \compile{x_2}}
+		\end{align*}
+		\end{document}
+	```
+	Compiling individual :{reactifi} reactives (left) to C code (right).
 ::
 
 
@@ -169,8 +169,8 @@ Thus, the generated update function for the :code{Monitor} source will only chec
 When there are multiple sources, then also the source groups need to check if that source activates or not.
 
 ::figure{label=fig:dataflow-filter-grouping}
-  :image{/Figures/Graphs/filesharing.pdf}
-  The :{flowgraph} of the adaptive file sharing case study.
+	:image{/Figures/Graphs/filesharing.pdf}
+	The :{flowgraph} of the adaptive file sharing case study.
 ::
 
 
@@ -192,9 +192,9 @@ This way, the compiler is able to maximize the memory available for executing th
 # Exemplary Compilation
 For illustration, consider the code below, defining a map reactive (:code{address}) with two inputs, :code{frame} and :code{subframe}; we assume that both frames are derived from a :code{Monitor} source (not shown for brevity).
 
-``
-  val address = (frame, subframe).map((fr, sub) => { /* extractAddress */ } )
-``
+```
+	val address = (frame, subframe).map((fr, sub) => { /* extractAddress */ } )
+```
 
 The generated C code is sketched in :ref{Figure; lst:compiler-output}.
 Since there are no folds, the program has only local state.
@@ -208,26 +208,26 @@ are deallocated immediately after they are used and no longer needed.
 We assume that :code{address_value} is used later in the program, otherwise the whole program would be optimized away.
 
 ::figure{label=lst:compiler-output}
-  ``{language=C}
-    address_t extractAddress(frame_t fr, frame_t sub) { /* extractAddress */ }
-    // state of fold reactives would be above
-    void update() {
-        bool monitor_condition;
-        frame_t frame_value;
-        frame_t subframe_value;
-        address_t address_value;
+	```code{lang=C}
+		address_t extractAddress(frame_t fr, frame_t sub) { /* extractAddress */ }
+		// state of fold reactives would be above
+		void update() {
+		    bool monitor_condition;
+		    frame_t frame_value;
+		    frame_t subframe_value;
+		    address_t address_value;
 
-        monitor_condition = runtime_is_triggered(Monitor)
-        if (monitor_condition) {
-            frame_value = ...;
-            subframe_value = ...;
-            address_value = extractAddress(frame_value, subframe_value);
-            deallocate(frame_value);
-            deallocate(subframe_value);
-        }
-    }
-  ``
-  Generated C code example.
+		    monitor_condition = runtime_is_triggered(Monitor)
+		    if (monitor_condition) {
+		        frame_value = ...;
+		        subframe_value = ...;
+		        address_value = extractAddress(frame_value, subframe_value);
+		        deallocate(frame_value);
+		        deallocate(subframe_value);
+		    }
+		}
+	```
+	Generated C code example.
 ::
 
 

@@ -17,14 +17,14 @@ These calculi usually have no inherent concept of unreliable communication over 
 :cite{Caires; Caires2017} adds linear types to the :math{\pi}-calculus, to model protocols including unreliable message delivery.
 However, even with unreliability addressed at the message level, these calculi do not understand how dataflow of the processes is connected, thus making automatic fault tolerance based on the application semantics hard to achieve.
 
-:cite{style=name; DalLago:2019:ITR} investigate theoretical foundations for typed runtime errors in the :math{\pi}-calculus.
+:cite{DalLago:2019:ITR; style=author} investigate theoretical foundations for typed runtime errors in the :math{\pi}-calculus.
 Cloud :cite{calculus; Jarraya2012} applies the above to a distributed system,
 but focuses on upholding security policies when migrating processes between virtual machines,
 which considers low level equivalence between implementations.
 More recently, :cite{Atkey; Atkey2017} adds external communication to classical processes with a focus on the external behavior of processes and less on internal details.
 
 
-The work by :cite{style=name; Gleissenthall:2019:PSS} uses the fact that typical applications have limited communication structures
+The work by :cite{Gleissenthall:2019:PSS; style=author} uses the fact that typical applications have limited communication structures
 and extracts synchronous specifications from programs with only minimal annotations.
 Properties of the asynchronous communication behavior of the application are derived and proven based on these annotations.
 Our calculus :{fr} has synchronous behavior which should make such verification techniques applicable.
@@ -66,7 +66,7 @@ together with a specification to automatically generate reliable message transfe
 However, Verdi does not support use of applications while offline,
 and it does not handle crashes of application.
 Both are limitations stemming from reducing the application model to the sent and received messages without considering their complete execution.
-:cite{style=name; Viering2018} develop a typing discipline to ensure that correctly typed programs,
+:cite{Viering2018; style=author} develop a typing discipline to ensure that correctly typed programs,
 will continue correct execution even in the presence of faults,
 but they require a central coordinator – devices disconnected from
 the central system are no longer considered part of the execution.

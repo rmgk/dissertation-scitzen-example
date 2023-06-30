@@ -11,11 +11,11 @@ We show that transactions on a single device are glitch-free, complete, determin
 The local guarantees constitute the foundation for fault tolerance.
 
 ::proofbox
-  ::definition{Syntax}
-    We write :math{→ = →_D \cup →_p}, and :math{→^*} for the transitive closure.
-    We write :math{μ \in D} to say that :math{μ} is the store of :math{D}, and likewise with other syntax.
-    We write :math{D \in D₀ → ... → D_n} and :math{D_i → D_j \in D₀ → ... → D_n} to say that :math{D} and :math{D_i → D_j}, respectively, are contained in the sequence :math{D₀ → ... → D_n}.
-  ::
+	::definition{Syntax}
+		We write :math{→ = →_D \cup →_p}, and :math{→^*} for the transitive closure.
+		We write :math{μ \in D} to say that :math{μ} is the store of :math{D}, and likewise with other syntax.
+		We write :math{D \in D₀ → ... → D_n} and :math{D_i → D_j \in D₀ → ... → D_n} to say that :math{D} and :math{D_i → D_j}, respectively, are contained in the sequence :math{D₀ → ... → D_n}.
+	::
 ::
 
 # Traces
@@ -26,20 +26,20 @@ We assume that traces for device evaluation are finite, i.e., that the evaluatio
 The proofs only reason about finite slices out of the full trace anyways, thus using only finite traces simplifies the presentation without affecting the proved properties.
 
 ::proofbox
-  ::definition{Trace}
-    A trace of a device :math{D₀}, written :math{"\trace{}(D₀)"}, is a sequence :math{D₀ →^* D_n},
-    where :math{D_n} cannot be further reduced.
-  ::
-  ::definition{Propagation}
-    Given :math{D₀}, a propagation :math{"p = \ptrace{}(D_i, D_j)"} is any maximally long subsequence :math{"D_i →_{p}^* D_j"} of :math{"\trace{}(D₀)"},
-    i.e., there is no longer sequence :math{"D_i' →_{p}^* D_j'"} that contains :math{"D_i →_{p}^* D_j"}.
-  ::
-  ::definition{Reevaluation}
-    We call any :math{"D \stp{r} D'"}, which was produced by the :rule{reevaluate} rule, a reevaluation of :math{r}.
-  ::
-  ::definition{Transaction}
-    Given a propagation :math{"p = \ptrace{}(D_i, D_j)"}, the transaction trace :math{"t = \txtrace{}(p)"} is :math{"D_{i-1} →_D p →_D D_{j+1}"}.
-  ::
+	::definition{Trace}
+		A trace of a device :math{D₀}, written :math{"\trace{}(D₀)"}, is a sequence :math{D₀ →^* D_n},
+		where :math{D_n} cannot be further reduced.
+	::
+	::definition{Propagation}
+		Given :math{D₀}, a propagation :math{"p = \ptrace{}(D_i, D_j)"} is any maximally long subsequence :math{"D_i →_{p}^* D_j"} of :math{"\trace{}(D₀)"},
+		i.e., there is no longer sequence :math{"D_i' →_{p}^* D_j'"} that contains :math{"D_i →_{p}^* D_j"}.
+	::
+	::definition{Reevaluation}
+		We call any :math{"D \stp{r} D'"}, which was produced by the :rule{reevaluate} rule, a reevaluation of :math{r}.
+	::
+	::definition{Transaction}
+		Given a propagation :math{"p = \ptrace{}(D_i, D_j)"}, the transaction trace :math{"t = \txtrace{}(p)"} is :math{"D_{i-1} →_D p →_D D_{j+1}"}.
+	::
 ::
 
 
@@ -53,15 +53,15 @@ Even in :{fr}, multiple reevaluations would produce incorrect values for folds, 
 
 
 ::proofbox
-  ::lemma{At-most-once evaluation; label=thm:at-most-once-reevaluation}
-    Each propagation :math{"\ptrace{}(D₀, D_n)"}
-    contains at most one reevaluation :math{"D \stp{r} D'"} of each reactive :math{r}.
-  ::
-  ::proof
-    By the premise of :rule{reevaluate} it must hold that :math{"\ready{P}{μ}{r}"} which requires :math{r\not\in P}.
-    However, the :rule{reevaluate} rule adds :math{r} to :math{P}, and no step during a propagation removes reactives from :math{P}.
-    Thus, there can be at most one reevaluation of each reactive :math{r}.
-  ::
+	::lemma{At-most-once evaluation; label=thm:at-most-once-reevaluation}
+		Each propagation :math{"\ptrace{}(D₀, D_n)"}
+		contains at most one reevaluation :math{"D \stp{r} D'"} of each reactive :math{r}.
+	::
+	::proof
+		By the premise of :rule{reevaluate} it must hold that :math{"\ready{P}{μ}{r}"} which requires :math{r\not\in P}.
+		However, the :rule{reevaluate} rule adds :math{r} to :math{P}, and no step during a propagation removes reactives from :math{P}.
+		Thus, there can be at most one reevaluation of each reactive :math{r}.
+	::
 ::
 
 
@@ -75,26 +75,26 @@ In :{fr}, a glitch happens precisely when the value of a reactive is written aft
 A system is called glitch-free if there are no glitches.
 
 ::proofbox
-  ::definition{Glitch; label=definition-formalization-glitch}
-    For a propagation :math{"p = \ptrace{}(D₀, D_n)"} and a reevaluation :math{"D_{j-1} \stp{r} D_j"} in :math{p}
-    and for any input :math{"r' \in \inputs{r, μ}\setminus\{r\}"} of :math{r},
-    any write :math{"D_{k-1} \stp{r'} D_k"} with :math{k > j} in :math{p} is called a glitch.
-  ::
+	::definition{Glitch; label=definition-formalization-glitch}
+		For a propagation :math{"p = \ptrace{}(D₀, D_n)"} and a reevaluation :math{"D_{j-1} \stp{r} D_j"} in :math{p}
+		and for any input :math{"r' \in \inputs{r, μ}\setminus\{r\}"} of :math{r},
+		any write :math{"D_{k-1} \stp{r'} D_k"} with :math{k > j} in :math{p} is called a glitch.
+	::
 
-  ::lemma{Glitch Freedom; label=thm:glitch-freedom}
-    There are no glitches in all propagations.
-  ::
+	::lemma{Glitch Freedom; label=thm:glitch-freedom}
+		There are no glitches in all propagations.
+	::
 
-  ::proof
-    By contradiction.
-    Assume there is a write on :math{r'} satisfying the conditions above.
-    Because :math{r} is reevaluated it must be :math{"\ready{P}{μ}{r}"} for some :math{μ} and :math{P}, thus :math{r' \in P} at the time of the reevaluation.
-    Due to at-most-once reevaluation (:ref{Lemma; thm:at-most-once-reevaluation}),
-    for :math{r' \in P} to be true, the sole reevaluation of :math{r'} at :math{"D_{i-1} \stp{r} D_i"} it must be :math{j > i},
-    i.e., :math{r'} is reevaluated before :math{r}.
-    However, :math{k > j > i} means that the reevaluation of :math{r} is between the reevaluation of :math{r} and the write of :math{r},
-    which by inspection of the rules is impossible.
-  ::
+	::proof
+		By contradiction.
+		Assume there is a write on :math{r'} satisfying the conditions above.
+		Because :math{r} is reevaluated it must be :math{"\ready{P}{μ}{r}"} for some :math{μ} and :math{P}, thus :math{r' \in P} at the time of the reevaluation.
+		Due to at-most-once reevaluation (:ref{Lemma; thm:at-most-once-reevaluation}),
+		for :math{r' \in P} to be true, the sole reevaluation of :math{r'} at :math{"D_{i-1} \stp{r} D_i"} it must be :math{j > i},
+		i.e., :math{r'} is reevaluated before :math{r}.
+		However, :math{k > j > i} means that the reevaluation of :math{r} is between the reevaluation of :math{r} and the write of :math{r},
+		which by inspection of the rules is impossible.
+	::
 ::
 
 
@@ -111,56 +111,56 @@ To this end, we first show that there is always a :math{"\mathit{ready}"} reacti
 and that exactly the reachable and not filtered reactives become active (:ref{Lemma; thm:propagation-activates-reachable}).
 
 ::proofbox
-  ::lemma{label=thm:always-ready}
-    For any step during a propagation, either all reactives are processed :math{"P = \mathit{dom}(μ)"},
-    or there is at least one :math{"\ready{P}{μ}{r}"}.
-  ::
-  ::proof
-    By construction.
-    Pick any unprocessed :math{r \in dom(μ) \setminus P}, if :math{r} is ready, we found a candidate.
-    Otherwise, there must be an unprocessed input :math{"r_i \in \inputs{r, μ}"} from which we continue our search.
-    This search must terminate, because the graph is acyclic.
-  ::
-  ::lemma{label=thm:propagation-activates-reachable}
-    At the end of any propagation started by a transaction on reactive :math{r} with store :math{μ}
-    the set of active reactives :math{A} is the set of transitively derived reactives of :math{r} excluding any paths on a reactive :math{r'} that is filtered :math{"\filterexp{μ, r'} ≠ true"}.
-  ::
-  ::proof
-    Inspection of the rules show that :math{r} is added to the active reactives :math{A} at the start of a propagation
-    (:rule{*tx} rules).
-    Reactives are :math{"\mathit{outdated}"} only if they are derived from reactives in :math{A}.
-    Exactly the :math{"\mathit{outdated}"} and :math{"\mathit{ready}"} reactives are processed by the :rule{reevaluate} rule which adds them to :math{A} if they are not filtered.
-    All other :math{"\mathit{ready}"} reactives are processed by the :rule{skip} rule, which does not add them to :math{A}.
-    Because of :ref{Lemma; thm:always-ready} there is always a ready reactive until all reactives are added to :math{P}
-    and reachable ones are also added to :math{A}.
-  ::
+	::lemma{label=thm:always-ready}
+		For any step during a propagation, either all reactives are processed :math{"P = \mathit{dom}(μ)"},
+		or there is at least one :math{"\ready{P}{μ}{r}"}.
+	::
+	::proof
+		By construction.
+		Pick any unprocessed :math{r \in dom(μ) \setminus P}, if :math{r} is ready, we found a candidate.
+		Otherwise, there must be an unprocessed input :math{"r_i \in \inputs{r, μ}"} from which we continue our search.
+		This search must terminate, because the graph is acyclic.
+	::
+	::lemma{label=thm:propagation-activates-reachable}
+		At the end of any propagation started by a transaction on reactive :math{r} with store :math{μ}
+		the set of active reactives :math{A} is the set of transitively derived reactives of :math{r} excluding any paths on a reactive :math{r'} that is filtered :math{"\filterexp{μ, r'} ≠ true"}.
+	::
+	::proof
+		Inspection of the rules show that :math{r} is added to the active reactives :math{A} at the start of a propagation
+		(:rule{*tx} rules).
+		Reactives are :math{"\mathit{outdated}"} only if they are derived from reactives in :math{A}.
+		Exactly the :math{"\mathit{outdated}"} and :math{"\mathit{ready}"} reactives are processed by the :rule{reevaluate} rule which adds them to :math{A} if they are not filtered.
+		All other :math{"\mathit{ready}"} reactives are processed by the :rule{skip} rule, which does not add them to :math{A}.
+		Because of :ref{Lemma; thm:always-ready} there is always a ready reactive until all reactives are added to :math{P}
+		and reachable ones are also added to :math{A}.
+	::
 
-  ::definition{Complete Reactives}
-    Given a propagation :math{"p = \ptrace{}(D, D')"} with respective stores :math{μ \in D} and :math{μ' \in D'},
-    and a new synthetic store :math{"μ'_r = \massign{μ'}{r}{μ(r).\vala{}}"} where only the value of :math{r} is unchanged.
-    We say a reactive :math{r} is :math{"\complete{r}"} in :math{p} if and only if
-    evaluating :math{r} in :math{μ'_r} produces the value of the reactive in the final store
-    :math{"\reevexp{r, μ'_r} = μ'(r).\vala{}"}.
-  ::
+	::definition{Complete Reactives}
+		Given a propagation :math{"p = \ptrace{}(D, D')"} with respective stores :math{μ \in D} and :math{μ' \in D'},
+		and a new synthetic store :math{"μ'_r = \massign{μ'}{r}{μ(r).\vala{}}"} where only the value of :math{r} is unchanged.
+		We say a reactive :math{r} is :math{"\complete{r}"} in :math{p} if and only if
+		evaluating :math{r} in :math{μ'_r} produces the value of the reactive in the final store
+		:math{"\reevexp{r, μ'_r} = μ'(r).\vala{}"}.
+	::
 
-  ::lemma{Complete Propagation; label=thm:complete-propagation}
-    For any propagation :math{p} starting with a transaction setting :math{r} to :math{v} and ending in store :math{μ'},
-    we call :math{p} complete if
+	::lemma{Complete Propagation; label=thm:complete-propagation}
+		For any propagation :math{p} starting with a transaction setting :math{r} to :math{v} and ending in store :math{μ'},
+		we call :math{p} complete if
 
-    * the transaction changes the correct reactive :math{"μ'(r).\vala{} = v"},
-    * all active derived reactives :math{"\{r' \in A\}"} are complete,
-    * all non-active folds and sources keep their values.
-  ::
-  ::proof
-    First, the :rule{*tx} rules cause a transaction to
-    set the correct state and mark the reactive as processed.
-    Because of at-most-once reevaluation (:ref{Lemma; thm:at-most-once-reevaluation})
-    we know those will not be changed again.
-    Second, all active reactives are reevaluated (:ref{Lemma; thm:propagation-activates-reachable}).
-    Due to glitch freedom (:ref{Lemma; thm:glitch-freedom}) each reevaluated reactive is complete
-    and because of at-most-once evaluation (:ref{Lemma; thm:at-most-once-reevaluation}) they do not change afterwards.
-    Finally, the :rule{skip} rule causes all non-active reactives to become processed without changing their value (:ref{Lemma; thm:propagation-activates-reachable}).
-  ::
+		* the transaction changes the correct reactive :math{"μ'(r).\vala{} = v"},
+		* all active derived reactives :math{"\{r' \in A\}"} are complete,
+		* all non-active folds and sources keep their values.
+	::
+	::proof
+		First, the :rule{*tx} rules cause a transaction to
+		set the correct state and mark the reactive as processed.
+		Because of at-most-once reevaluation (:ref{Lemma; thm:at-most-once-reevaluation})
+		we know those will not be changed again.
+		Second, all active reactives are reevaluated (:ref{Lemma; thm:propagation-activates-reachable}).
+		Due to glitch freedom (:ref{Lemma; thm:glitch-freedom}) each reevaluated reactive is complete
+		and because of at-most-once evaluation (:ref{Lemma; thm:at-most-once-reevaluation}) they do not change afterwards.
+		Finally, the :rule{skip} rule causes all non-active reactives to become processed without changing their value (:ref{Lemma; thm:propagation-activates-reachable}).
+	::
 ::
 
 
@@ -177,25 +177,25 @@ Thus, when considering the overall result of a transaction, the execution is sti
 
 
 ::proofbox
-  ::lemma{Confluence; label=thm:deterministic-propagation}
-    For any two propagations :math{"p₁ = \ptrace{}(D, D₁)"} and :math{"p₂ = \ptrace{}(D, D₂)"} starting at the same configuration :math{D},
-    the final states :math{μ₁ \in D₁} and :math{μ₂ \in D₂} are equal :math{μ₁ = μ₂}.
-  ::
-  ::proof
-    No reactives are created during a propagation, thus :math{dom(μ) = dom(μ₁) = dom(μ₂)}.
-    Due to :ref{Lemma; thm:propagation-activates-reachable} the set of active reactives :math{A₁ \in D₁} and :math{A₂ \in D₂} are the same :math{A₁ = A₂},
-    and by complete propagation (:ref{Lemma; thm:complete-propagation}) they evaluate to the same values.
-  ::
+	::lemma{Confluence; label=thm:deterministic-propagation}
+		For any two propagations :math{"p₁ = \ptrace{}(D, D₁)"} and :math{"p₂ = \ptrace{}(D, D₂)"} starting at the same configuration :math{D},
+		the final states :math{μ₁ \in D₁} and :math{μ₂ \in D₂} are equal :math{μ₁ = μ₂}.
+	::
+	::proof
+		No reactives are created during a propagation, thus :math{dom(μ) = dom(μ₁) = dom(μ₂)}.
+		Due to :ref{Lemma; thm:propagation-activates-reachable} the set of active reactives :math{A₁ \in D₁} and :math{A₂ \in D₂} are the same :math{A₁ = A₂},
+		and by complete propagation (:ref{Lemma; thm:complete-propagation}) they evaluate to the same values.
+	::
 
-  ::lemma{Determinism; label=thm:deterministic-language}
-    For any device :math{D} all execution traces :math{"\trace{}(D)"} contain the same sequence of :math{→_D} steps, i.e., they are equal after removing all :math{→_p} steps.
-  ::
+	::lemma{Determinism; label=thm:deterministic-language}
+		For any device :math{D} all execution traces :math{"\trace{}(D)"} contain the same sequence of :math{→_D} steps, i.e., they are equal after removing all :math{→_p} steps.
+	::
 
-  ::proof
-    Follows from the determinism of the :math{\lambda}-calculus,
-    which we extend only with deterministic :math{→_D}-rules,
-    and the confluent propagation (:ref{Lemma; thm:deterministic-propagation}).
-  ::
+	::proof
+		Follows from the determinism of the :math{\lambda}-calculus,
+		which we extend only with deterministic :math{→_D}-rules,
+		and the confluent propagation (:ref{Lemma; thm:deterministic-propagation}).
+	::
 ::
 
 
@@ -212,15 +212,15 @@ In a distributed :{fr} application, propagations are executed concurrently.
 However, because there is no shared state, propagations on different devices are naturally isolated from each other.
 
 ::proofbox
-  ::lemma{Isolation; label=thm:synchronous-updates}
-    The resulting configuration :math{D'} of a propagation :math{"p = \ptrace{}(D, D')"} is
-    independently of any concurrent transaction.
-  ::
-  ::proof
-    Propagation is confluent (see :ref{Lemma; thm:deterministic-propagation}) and
-    there are no concurrent transactions by inspection of the rules.
-    None of the :rule{*tx} rules may trigger concurrent transactions when a propagation is in progress.
-  ::
+	::lemma{Isolation; label=thm:synchronous-updates}
+		The resulting configuration :math{D'} of a propagation :math{"p = \ptrace{}(D, D')"} is
+		independently of any concurrent transaction.
+	::
+	::proof
+		Propagation is confluent (see :ref{Lemma; thm:deterministic-propagation}) and
+		there are no concurrent transactions by inspection of the rules.
+		None of the :rule{*tx} rules may trigger concurrent transactions when a propagation is in progress.
+	::
 ::
 
 
@@ -244,23 +244,23 @@ This simplifies the proof.
 SID-UP :cite{Drechsler2014} implements an efficient way to not compute skips at all.
 
 ::proofbox
-  ::lemma
-    For a propagation :math{"p = \ptrace{}(D₀, D_n)"} and device :math{D_i \in p} with processed reactives :math{P \in D_i} and store :math{μ \in D_i}.
-    If the :rule{skip} rule is not applicable to :math{D_i},
-    then reevaluating a reactive :math{"\nready{P}{μ}{r}"} violates
-    one of our correctness guarantees.
-  ::
+	::lemma
+		For a propagation :math{"p = \ptrace{}(D₀, D_n)"} and device :math{D_i \in p} with processed reactives :math{P \in D_i} and store :math{μ \in D_i}.
+		If the :rule{skip} rule is not applicable to :math{D_i},
+		then reevaluating a reactive :math{"\nready{P}{μ}{r}"} violates
+		one of our correctness guarantees.
+	::
 
-  ::proof
-    By contradiction.
-    Assume there exists a reactive :math{r \in dom(μ)} but :math{"\nready{P}{μ}{r}"}.
-    It holds that :math{r \not\in P}, otherwise :math{r} would be reevaluated twice (see :ref{Lemma; thm:at-most-once-reevaluation}).
-    Inspecting the :ref{:math{ready}; style=plain; fig:auxiliary-functions} function shows that
-    there must be an input :math{"r_i \in \inputs{r, μ}"} which is not yet processed :math{r_i \not\in P}.
-    We use a similar argument as in :ref{Lemma; thm:always-ready} to show that either :math{r_i} or one of its predecessors must be ready.
-    Due to complete propagation (:ref{Lemma; thm:complete-propagation}) the reactive :math{r_i} will be reevaluated in the future because it has a ready predecessor.
-    Thus, reevaluating :math{r} is not glitch-free (:ref{Lemma; thm:glitch-freedom}).
-  ::
+	::proof
+		By contradiction.
+		Assume there exists a reactive :math{r \in dom(μ)} but :math{"\nready{P}{μ}{r}"}.
+		It holds that :math{r \not\in P}, otherwise :math{r} would be reevaluated twice (see :ref{Lemma; thm:at-most-once-reevaluation}).
+		Inspecting the :ref{:math{ready}; style=plain; fig:auxiliary-functions} function shows that
+		there must be an input :math{"r_i \in \inputs{r, μ}"} which is not yet processed :math{r_i \not\in P}.
+		We use a similar argument as in :ref{Lemma; thm:always-ready} to show that either :math{r_i} or one of its predecessors must be ready.
+		Due to complete propagation (:ref{Lemma; thm:complete-propagation}) the reactive :math{r_i} will be reevaluated in the future because it has a ready predecessor.
+		Thus, reevaluating :math{r} is not glitch-free (:ref{Lemma; thm:glitch-freedom}).
+	::
 ::
 
 
@@ -281,29 +281,29 @@ Thus, fold reactives derived from a replicated reactive must be distributed them
 This property is captured by the following theorem.
 
 ::proofbox
-  ::definition{Consistent reactives}
-    Given a reactive :math{r} and devices :math{D₁} and :math{D₂} with states :math{μ_1 \in D₁} and :math{μ₂ \in D₂},
-    we say :math{r} is consistent if
-    :math{"r \not \in \mathit{dom}(μ₁) \cap \mathit{dom}(μ₂)"} or :math{μ_1(r).val = μ_2(r).val}
-  ::
-  ::lemma{Eventual consistency; label=thm:eventual-consistent-reactives}
-    Given two devices :math{D_1} and :math{D_2}
-    and reactive :math{"r \in \mathit{dom}(M)"}.
-    If there are no other changes to :math{r} and the devices eventually exchange values,
-    then :math{r} is consistent.
-  ::
-  ::proof
-    Follows directly from commutativity and idempotence of :math{M(r)} once both devices have received the remote value at least once with the :rule{synchronizetx} rule.
-  ::
-  ::theorem{label=thm:final-distribution}
-    A fully connected component of reactives :math{R} in the :{flowgraph} is eventually consistent,
-    if all sources :math{R_s \subset R} and folds :math{R_f \subset R} are eventually consistent.
-  ::
-  ::proof
-    Once all :math{R_s} and :math{R_f} reach a consistent state,
-    then because of complete propagation (:ref{Lemma; thm:complete-propagation}),
-    all derived reactives :math{R} become consistent.
-  ::
+	::definition{Consistent reactives}
+		Given a reactive :math{r} and devices :math{D₁} and :math{D₂} with states :math{μ_1 \in D₁} and :math{μ₂ \in D₂},
+		we say :math{r} is consistent if
+		:math{"r \not \in \mathit{dom}(μ₁) \cap \mathit{dom}(μ₂)"} or :math{μ_1(r).val = μ_2(r).val}
+	::
+	::lemma{Eventual consistency; label=thm:eventual-consistent-reactives}
+		Given two devices :math{D_1} and :math{D_2}
+		and reactive :math{"r \in \mathit{dom}(M)"}.
+		If there are no other changes to :math{r} and the devices eventually exchange values,
+		then :math{r} is consistent.
+	::
+	::proof
+		Follows directly from commutativity and idempotence of :math{M(r)} once both devices have received the remote value at least once with the :rule{synchronizetx} rule.
+	::
+	::theorem{label=thm:final-distribution}
+		A fully connected component of reactives :math{R} in the :{flowgraph} is eventually consistent,
+		if all sources :math{R_s \subset R} and folds :math{R_f \subset R} are eventually consistent.
+	::
+	::proof
+		Once all :math{R_s} and :math{R_f} reach a consistent state,
+		then because of complete propagation (:ref{Lemma; thm:complete-propagation}),
+		all derived reactives :math{R} become consistent.
+	::
 ::
 
 
@@ -323,17 +323,17 @@ Transactions that happen on the same device are ordered in their natural order.
 Once synchronization happened, transactions on the sending device are ordered before transactions on the receiving device.
 
 ::proofbox
-  ::definition{Transaction order}
-    Given a device :math{D} with propagations :math{"p_{i,j}"} and transactions :math{"t_{i,j} = \txtrace{}(p_{i, j})"} we say that :math{t_i < t_j} if the :math{t_i} occurs first in the trace of the device :math{"\trace{}(D)"}.
+	::definition{Transaction order}
+		Given a device :math{D} with propagations :math{"p_{i,j}"} and transactions :math{"t_{i,j} = \txtrace{}(p_{i, j})"} we say that :math{t_i < t_j} if the :math{t_i} occurs first in the trace of the device :math{"\trace{}(D)"}.
 
-    For two devices :math{"D_{s,r}"} in a communication system :math{"(M; D₁ | … | D_s| … | D_r| … D_n)"} and transactions :math{"t_{s,r}"} on the respective devices we say that :math{t_s < t_r} if there was an application of the :rule{synchronizetx} involving :math{D_s} and :math{D_r} that happened in the communication trace after :math{t_s} and before :math{t_r}.
-  ::
-  ::definition{Stores of transactions}
-    Given a device :math{D} with propagation :math{"p = \ptrace{}(D, D')"} and transaction :math{"t = \txtrace{}(p)"}, we say that :math{μ_t} is the store at the end of transaction :math{t}.
-  ::
-  ::definition{Causal consistency}
-    A transaction store :math{μ_t} is causally consistent, if for each replicated reactive :math{r ∈ dom(M) ∩ dom(μ_t)} the value in the store is larger than the value of all prior transactions :math{"μ_t(r).\vala{} ≥ μ_{t_0}(r).\vala{}"} for :math{t₀ < t}.
-  ::
+		For two devices :math{"D_{s,r}"} in a communication system :math{"(M; D₁ | … | D_s| … | D_r| … D_n)"} and transactions :math{"t_{s,r}"} on the respective devices we say that :math{t_s < t_r} if there was an application of the :rule{synchronizetx} involving :math{D_s} and :math{D_r} that happened in the communication trace after :math{t_s} and before :math{t_r}.
+	::
+	::definition{Stores of transactions}
+		Given a device :math{D} with propagation :math{"p = \ptrace{}(D, D')"} and transaction :math{"t = \txtrace{}(p)"}, we say that :math{μ_t} is the store at the end of transaction :math{t}.
+	::
+	::definition{Causal consistency}
+		A transaction store :math{μ_t} is causally consistent, if for each replicated reactive :math{r ∈ dom(M) ∩ dom(μ_t)} the value in the store is larger than the value of all prior transactions :math{"μ_t(r).\vala{} ≥ μ_{t_0}(r).\vala{}"} for :math{t₀ < t}.
+	::
 ::
 
 
@@ -343,30 +343,30 @@ Finally, we show that any inconsistency on arbitrarily many devices would alread
 
 
 ::proofbox
-  ::lemma{Two device causal consistency; label=formalization-lemma-pairwise_causality}
-    When there are exactly two devices :math{D₁} and :math{D₂} communicating, then all transactions on both devices are causally consistent.
-  ::
-  ::proof
-    We only look at the case of :rule{synchronizetx} transactions.
-    All other transactions only affect the local device and thus are trivially causally consistent.
-    We assume the stores of both devices before the transactions are causally consistent.
-    The sending device :math{D_s} with store :math{μ_s} is not modified, thus remains consistent.
-    The receiving device :math{D_r} starts a transaction :math{t_r} in store :math{μ_r} ending with store :math{μ'_r}.
-    The receiving device :math{D_r} starts a transaction where the value of each replicated reactive :math{r_i} receives a new value :math{"v_i = \mathit{merge_i}(μ_s(r_i).\vala{}, μ_r(r_i).\vala{}"}.
-    Due to complete propagation (:ref{Lemma; thm:complete-propagation}) these are the final values of the replicated reactives in the receiving store :math{μ'_r}.
-    Because merge is idempotent all values :math{v_i} are larger than the values of the sending and receiving devices.
-    Because of the same reasoning as for local transaction, the remaining propagation does also only make updated reactives larger.
-    Thus, :rule{synchronizetx} for two devices keeps causal consistency.
-  ::
+	::lemma{Two device causal consistency; label=formalization-lemma-pairwise_causality}
+		When there are exactly two devices :math{D₁} and :math{D₂} communicating, then all transactions on both devices are causally consistent.
+	::
+	::proof
+		We only look at the case of :rule{synchronizetx} transactions.
+		All other transactions only affect the local device and thus are trivially causally consistent.
+		We assume the stores of both devices before the transactions are causally consistent.
+		The sending device :math{D_s} with store :math{μ_s} is not modified, thus remains consistent.
+		The receiving device :math{D_r} starts a transaction :math{t_r} in store :math{μ_r} ending with store :math{μ'_r}.
+		The receiving device :math{D_r} starts a transaction where the value of each replicated reactive :math{r_i} receives a new value :math{"v_i = \mathit{merge_i}(μ_s(r_i).\vala{}, μ_r(r_i).\vala{}"}.
+		Due to complete propagation (:ref{Lemma; thm:complete-propagation}) these are the final values of the replicated reactives in the receiving store :math{μ'_r}.
+		Because merge is idempotent all values :math{v_i} are larger than the values of the sending and receiving devices.
+		Because of the same reasoning as for local transaction, the remaining propagation does also only make updated reactives larger.
+		Thus, :rule{synchronizetx} for two devices keeps causal consistency.
+	::
 
-  ::lemma{Causal consistency}
-    All communicating devices are causally consistent.
-  ::
-  ::proof
-    Pairwise causal consistency (:ref{Lemma; formalization-lemma-pairwise_causality}) directly generalizes to causal consistency if all replicated reactives are synchronized by each pair of devices.
-    Because all reactives are synchronized and because of the monotonicity of the merge function any causal inconsistency on the receiving device would have already be present on a sending device.
-    However, we assume that devices start in a causally consistent state and local transactions cannot introduce causal inconsistencies by definition.
-  ::
+	::lemma{Causal consistency}
+		All communicating devices are causally consistent.
+	::
+	::proof
+		Pairwise causal consistency (:ref{Lemma; formalization-lemma-pairwise_causality}) directly generalizes to causal consistency if all replicated reactives are synchronized by each pair of devices.
+		Because all reactives are synchronized and because of the monotonicity of the merge function any causal inconsistency on the receiving device would have already be present on a sending device.
+		However, we assume that devices start in a causally consistent state and local transactions cannot introduce causal inconsistencies by definition.
+	::
 ::
 
 
@@ -386,21 +386,21 @@ The reduction relation :math{→_D} reduces configurations with proper devices t
 and propagations started at a proper device will result in a proper device.
 
 ::proofbox
-  ::definition{Proper device}
-    A device :math{"D = \device{\rp{t}{μ}{}}{Σ}"} is proper if and only if
-    all sources and folds in :math{μ} are included in :math{Σ} with
-    :math{"\forall r \in dom(μ): (\inputs{r, μ}{} = ∅ \vee r \in \inputs{r, μ}) → μ(r).val = Σ(r)"}.
-  ::
+	::definition{Proper device}
+		A device :math{"D = \device{\rp{t}{μ}{}}{Σ}"} is proper if and only if
+		all sources and folds in :math{μ} are included in :math{Σ} with
+		:math{"\forall r \in dom(μ): (\inputs{r, μ}{} = ∅ \vee r \in \inputs{r, μ}) → μ(r).val = Σ(r)"}.
+	::
 
-  ::lemma{Evaluation produces proper devices; label=thm:evaluation-proper-device}
-    If :math{"D = \device{\rp{t}{μ}{}}{Σ}"} is proper,
-    then :math{"D' = \device{\rp{t'}{μ'}{}}{Σ'}"} with :math{D →^* D'} is also proper.
-  ::
-  ::proof
-    The :rule{source} and :rule{fold} rules ensure that created reactives are included in the snapshot,
-    and at no other time is the store modified outside an ongoing propagation.
-    The :rule{commit} rule updates the snapshot to include the values of all reactives which were active during propagation.
-  ::
+	::lemma{Evaluation produces proper devices; label=thm:evaluation-proper-device}
+		If :math{"D = \device{\rp{t}{μ}{}}{Σ}"} is proper,
+		then :math{"D' = \device{\rp{t'}{μ'}{}}{Σ'}"} with :math{D →^* D'} is also proper.
+	::
+	::proof
+		The :rule{source} and :rule{fold} rules ensure that created reactives are included in the snapshot,
+		and at no other time is the store modified outside an ongoing propagation.
+		The :rule{commit} rule updates the snapshot to include the values of all reactives which were active during propagation.
+	::
 ::
 
 
@@ -417,10 +417,10 @@ as if the crash had not happened.
 
 
 ::proofbox
-  ::definition{Creation prefix}
-    The creation prefix of a device, :math{"\ctrace{}(D₀, D_n)"},
-    is the longest prefix  :math{D₀ →_p^* D_n} of :math{"trace(D_{0})"}  where none of the steps in the trace was produced by the :rule{*tx} or :rule{access} rules.
-  ::
+	::definition{Creation prefix}
+		The creation prefix of a device, :math{"\ctrace{}(D₀, D_n)"},
+		is the longest prefix  :math{D₀ →_p^* D_n} of :math{"trace(D_{0})"}  where none of the steps in the trace was produced by the :rule{*tx} or :rule{access} rules.
+	::
 ::
 
 
@@ -432,24 +432,24 @@ All restored reactives have the same value they had before the crash.
 However, reactives created after the creation prefix have not yet been restored.
 
 ::proofbox
-  ::lemma{label=thm:correct-restoration}
-    For any proper device :math{"D \in \trace{}(D₀)"} with :math{"D = \device{\rp{t}{μ}{}}{Σ}"} and :math{"D₀ = \device{L}{Σ₀}"}
-    the re-execution of the creation trace of the application with the snapshot :math{"\ctrace{}(\device{L}{Σ}, D')"} ending with :math{D'}
-    has a store :math{μ' \in D'}
-    which agrees with the original store :math{μ' \subseteq μ}.
-  ::
-  ::proof
-    Creation of reactives during restoration still happens in the same order,
-    because there are no steps produced by the :rule{access} rule in the creation prefix.
-    That is, the execution of the process does not depend on the values in the snapshot.
-    In particular, :math{"\mathit{dom}(μ') \subseteq \mathit{dom}(μ)"}.
-    It remains to show that each reactive :math{"r \in \mathit{dom}(μ')"} matches the value before the crash :math{"μ(r).\vala{} = μ(r).\vala{}"}.
-    Due to proper devices, it holds that :math{\forall r \in dom(Σ) \cap dom(μ): μ(r).val = Σ(r)}.
-    For the :rule{source} and :rule{fold} rules, the lookup function returns :math{Σ(r)} as a new value,
-    which is equal to :math{"μ(r).\vala{}"}.
-    For the :rule{map} and :rule{flatten} rules, the new value is computed from the values of the dependencies,
-    which is equal to :math{"μ(r).\vala{}"} because of complete propagation (:ref{Lemma; thm:complete-propagation}).
-  ::
+	::lemma{label=thm:correct-restoration}
+		For any proper device :math{"D \in \trace{}(D₀)"} with :math{"D = \device{\rp{t}{μ}{}}{Σ}"} and :math{"D₀ = \device{L}{Σ₀}"}
+		the re-execution of the creation trace of the application with the snapshot :math{"\ctrace{}(\device{L}{Σ}, D')"} ending with :math{D'}
+		has a store :math{μ' \in D'}
+		which agrees with the original store :math{μ' \subseteq μ}.
+	::
+	::proof
+		Creation of reactives during restoration still happens in the same order,
+		because there are no steps produced by the :rule{access} rule in the creation prefix.
+		That is, the execution of the process does not depend on the values in the snapshot.
+		In particular, :math{"\mathit{dom}(μ') \subseteq \mathit{dom}(μ)"}.
+		It remains to show that each reactive :math{"r \in \mathit{dom}(μ')"} matches the value before the crash :math{"μ(r).\vala{} = μ(r).\vala{}"}.
+		Due to proper devices, it holds that :math{\forall r \in dom(Σ) \cap dom(μ): μ(r).val = Σ(r)}.
+		For the :rule{source} and :rule{fold} rules, the lookup function returns :math{Σ(r)} as a new value,
+		which is equal to :math{"μ(r).\vala{}"}.
+		For the :rule{map} and :rule{flatten} rules, the new value is computed from the values of the dependencies,
+		which is equal to :math{"μ(r).\vala{}"} because of complete propagation (:ref{Lemma; thm:complete-propagation}).
+	::
 ::
 
 # Incremental Restoration
@@ -460,17 +460,17 @@ and firing of new transactions may cause different reactions.
 We first show that the value of restored reactives is correct, independent of the order of restoration.
 
 ::proofbox
-  ::lemma{label=thm:creation-after-restoration}
-    Assume a restoration of :math{"\ctrace{}(D₀', D')"} as in :ref{Lemma; thm:correct-restoration}.
-    Creation of new reactives in the restored trace :math{"D' \in \trace{}(D₀')"}
-    will produce a store :math{μ'} compatible with the store :math{μ} of the crashed device :math{D}:
-    :math{\forall r \in dom(μ) \cap dom(μ') : μ(r) = μ'(r)}.
-  ::
-  ::proof
-    :ref{Lemma; thm:correct-restoration} does not depend on the order in which reactives are restored.
-    Thus, the reactives are restored with the correct values,
-    independent of the order of their restoration.
-  ::
+	::lemma{label=thm:creation-after-restoration}
+		Assume a restoration of :math{"\ctrace{}(D₀', D')"} as in :ref{Lemma; thm:correct-restoration}.
+		Creation of new reactives in the restored trace :math{"D' \in \trace{}(D₀')"}
+		will produce a store :math{μ'} compatible with the store :math{μ} of the crashed device :math{D}:
+		:math{\forall r \in dom(μ) \cap dom(μ') : μ(r) = μ'(r)}.
+	::
+	::proof
+		:ref{Lemma; thm:correct-restoration} does not depend on the order in which reactives are restored.
+		Thus, the reactives are restored with the correct values,
+		independent of the order of their restoration.
+	::
 ::
 
 
@@ -478,18 +478,18 @@ Triggering new transactions after restoring the creation prefix of the device :m
 That is, the same transaction propagated in the original device :math{D} and the restored device :math{D'} will change the same reactives consistently.
 
 ::proofbox
-  ::lemma{label=thm:action-after-restoration}
-    Assume a device :math{D} and the restored device :math{D'} as in :ref{Lemma; thm:creation-after-restoration},
-    i.e., their stores :math{μ \in D} and :math{μ' \in D'} are compatible :math{\forall r \in dom(μ) \cap dom(μ') : μ(r) = μ'(r)}.
-    Propagating the same transaction on both devices produces new devices :math{D →_p^* D_p} and :math{D' →_p^* D'_p}
-    with stores :math{μ_p \in D_p} and :math{μ_p' \in D_p'} that are still compatible:
-    :math{\forall r \in dom(μ_p) \cap dom(μ_p') : μ_p(r) = μ_p'(r)}.
-  ::
-  ::proof
-    Follows from complete propagation for the same store and transaction (:ref{Lemma; thm:complete-propagation}).
-    The updated restored store is still a subset of the updated store before the crash :math{μ_p' \subseteq μ_p},
-    as the same values have been updated in both stores.
-  ::
+	::lemma{label=thm:action-after-restoration}
+		Assume a device :math{D} and the restored device :math{D'} as in :ref{Lemma; thm:creation-after-restoration},
+		i.e., their stores :math{μ \in D} and :math{μ' \in D'} are compatible :math{\forall r \in dom(μ) \cap dom(μ') : μ(r) = μ'(r)}.
+		Propagating the same transaction on both devices produces new devices :math{D →_p^* D_p} and :math{D' →_p^* D'_p}
+		with stores :math{μ_p \in D_p} and :math{μ_p' \in D_p'} that are still compatible:
+		:math{\forall r \in dom(μ_p) \cap dom(μ_p') : μ_p(r) = μ_p'(r)}.
+	::
+	::proof
+		Follows from complete propagation for the same store and transaction (:ref{Lemma; thm:complete-propagation}).
+		The updated restored store is still a subset of the updated store before the crash :math{μ_p' \subseteq μ_p},
+		as the same values have been updated in both stores.
+	::
 ::
 
 When propagating the same transaction on the original device :math{D} and the restored device :math{D'},
@@ -506,13 +506,13 @@ In conclusion, :ref{Lemma; thm:evaluation-proper-device} shows that snapshots co
 In addition, :ref{Lemma; thm:creation-after-restoration} and :ref{Lemma; thm:action-after-restoration} show that new transactions may immediately change the store for a partially restored application without compromising correctness.
 
 ::proofbox
-  ::theorem{Restoration; label=thm:final-restoration}
-    The creation prefix of the execution of an application is restored exactly as before a crash,
-    and after the creation prefix any transaction causes the same changes as before the crash.
-  ::
-  ::proof
-    Follows from :ref{Lemma; thm:correct-restoration}, :ref{Lemma; thm:creation-after-restoration}, and :ref{Lemma; thm:action-after-restoration}.
-  ::
+	::theorem{Restoration; label=thm:final-restoration}
+		The creation prefix of the execution of an application is restored exactly as before a crash,
+		and after the creation prefix any transaction causes the same changes as before the crash.
+	::
+	::proof
+		Follows from :ref{Lemma; thm:correct-restoration}, :ref{Lemma; thm:creation-after-restoration}, and :ref{Lemma; thm:action-after-restoration}.
+	::
 ::
 
 # Conclusion

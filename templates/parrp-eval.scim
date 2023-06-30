@@ -2,7 +2,7 @@
 
 \standaloneconfig{border=4mm 0cm 0cm 4mm} 
 
-:{xetex fonts}
+:{xetexFonts}
 
 \usepackage{overpic}
 \usepackage{caption}

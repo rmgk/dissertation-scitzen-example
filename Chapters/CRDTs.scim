@@ -93,16 +93,16 @@ Since most applications have pairwise interactions between many of their compone
 Thus – because this large CRDT is then used by all parts of the application – modularity is lost:cite{; Alvaro2013ConsistencyBorders}.
 
 ::figure{label=fig:crdt-composition}
-  :image{/Figures/System/composeTraditional.pdf}
-  Composing multiple CRDTs in a traditional application results in a single monolithic CRDT, thus losing modularity.
+	:image{/Figures/System/composeTraditional.pdf}
+	Composing multiple CRDTs in a traditional application results in a single monolithic CRDT, thus losing modularity.
 ::
 
 
 # How :{cvtr} Fosters Modular Composition
 
 ::figure{label=fig:dataflow-graph-composes-crdt}
-  :image{/Figures/System/composeREScala.pdf}
-  A :{flowgraph} provides modularity and transactions for multiple CRDTs.
+	:image{/Figures/System/composeREScala.pdf}
+	A :{flowgraph} provides modularity and transactions for multiple CRDTs.
 ::
 
 We have shown how :{cvtr} provides causal consistency for multiple CRDTs in :ref{Section; section-dataflow_causal_consistency}.
@@ -180,8 +180,8 @@ Second, we implement the Raft consensus algorithm as a CRDT, thus providing appl
 label = section-crdts-delta_replication
 
 ::figure{label=figure-crdts-workflow}
-  :image{maxwidth=0.8; /Figures/System/crdt-workflow.pdf}
-  Visualization of a workflow with data at different devices.
+	:image{maxwidth=0.8; /Figures/System/crdt-workflow.pdf}
+	Visualization of a workflow with data at different devices.
 ::
 
 :ref{Figure; figure-crdts-workflow} visualizes the following example of a distributed workflow that spans multiple users and devices.
@@ -197,8 +197,8 @@ To address this problem, :{rescala} only synchronizes a replicated reactive, if 
 For example, the re-encoded video is not replicated back to the user doing the upload.
 
 ::figure{label=figure-crdts-loss_of_causality}
-  :image{maxwidth=0.6; /Figures/System/crdt-loss-of-causality.pdf}
-  Loss of causality when transactions are split and later recombined.
+	:image{maxwidth=0.6; /Figures/System/crdt-loss-of-causality.pdf}
+	Loss of causality when transactions are split and later recombined.
 ::
 
 However, doing so naively breaks causal consistency in certain network topologies (those where there are multiple communication paths between two devices).

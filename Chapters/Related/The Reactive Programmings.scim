@@ -6,7 +6,7 @@ This section presents approaches that either are syntactically inspired by react
 
 ## Functional Reactive Programming
 
-:cite{Elliott2010CTP; style=name} states that the two principles of Functional Reactive Programming (FRP) are denotational design and continuous time.
+:cite{Elliott2010CTP; style=author} states that the two principles of Functional Reactive Programming (FRP) are denotational design and continuous time.
 :{rescala} does not support continuous time, and :{fr} is not a denotational semantic.
 This section explains why that is fine and why FRP is still relevant for this thesis.
 
@@ -75,7 +75,7 @@ The execution strategy of FELM allows the integration of non-blocking execution 
 :cite{Scala.React; Maier2012} integrates with thread pools of external libraries,
 and also introduces a domain specific language to combine temporal sequences of event occurrences.
 
-For further reading, :cite{Bainomugisha:2013:SRP:2501654.2501666; style=name}
+For further reading, :cite{Bainomugisha:2013:SRP:2501654.2501666; style=author}
 provide a comprehensive survey on reactive programming languages,
 with a focus on the implementation model and features supported by the individual implementations.
 
@@ -88,7 +88,7 @@ Esterel was designed for embedded reactive systems such as microcontrollers or d
 The goals of Esterel are to provide deterministic concurrency, that is, even though the program is written in a style that looks like concurrent imperative code the resulting execution only has a single valid set of outputs for each input at a specific time.
 This is achieved by compiling Esterel programs into a dependency graph very similar in nature to the implementations of reactive programming languages.
 Due to the imperative syntax, it is possible to write syntacticlly correct Esterel programs that are not deterministic in nature or require circular logic which cannot be expressed as an acyclic graph, those programs are simply rejected by the compiler.
-Quite recently, :cite{style=name; Florence:2019:CEN} provided a calculus for Esterel that expresses the language in a style more similar to what functional reactive programmers would expect – although still consisting of explicit writes to signals instead of a declarative description.
+Quite recently, :cite{Florence:2019:CEN; style=author} provided a calculus for Esterel that expresses the language in a style more similar to what functional reactive programmers would expect – although still consisting of explicit writes to signals instead of a declarative description.
 
 What Esterel makes explicit, however, is the idea of synchronous execution.
 The idea of synchronous execution is that when a change in inputs occurs, then all derived values are conceptually computed at the same time.
@@ -97,7 +97,7 @@ However, the formulation using synchronous execution makes the relation to physi
 That is, a static :{flowgraph} is related to a hardware design where all computations happen at the same time, but only the final stable value is visible.
 
 There are other synchronous programming languages such as :cite{CoReA; DBLP:conf/wdag/BoniolA93} and :cite{Céu; DBLP:conf/sensys/SantAnnaRILT13} that focus on deterministic concurrency for embedded systems.
-:cite{style=name; amadio2006reactive} discuss using synchronous programming for coordination of general multi-threaded systems.
+:cite{amadio2006reactive; style=author} discuss using synchronous programming for coordination of general multi-threaded systems.
 Differently from the imperative synchronous style pioneered by Esterel, there are two prominent synchronous dataflow languages,
 :cite{SIGNAL; DBLP:conf/fpca/GautierG87} and :cite{Lustre; DBLP:conf/popl/CaspiPHP87} that use a more declarative style do define their semantics.
 
@@ -225,7 +225,7 @@ is captured by a translation to ConcurrentML, hindering formal reasoning about t
 behavior of the complete system.
 An additional limitation of FELM is that the :{flowgraph} cannot be modified at runtime.
 
-:cite{Kamina2018; style=name} provide a formalization which
+:cite{Kamina2018; style=author} provide a formalization which
 aims to simplify the abstractions used in RP. Thus, their formalization is intentionally minimalistic.
 In particular, their formalization uses standard operational
 semantics for the evaluation of the surface language but uses denotational semantics (functions on sets) for propagation of changes through the :{flowgraph}.
@@ -241,7 +241,7 @@ and does not integrate distributed state with local operations.
 
 ## Building Blocks for Reactive Programming Implementations
 
-In the area of the implementation of RP languages, :cite{style=name; DBLP:journals/programming/RamsonH17} proposed Active
+In the area of the implementation of RP languages, :cite{DBLP:journals/programming/RamsonH17; style=author} proposed Active
 Expressions as a fundamental primitive
 for different RP implementations.
 

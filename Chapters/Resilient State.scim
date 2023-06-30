@@ -173,8 +173,8 @@ so the handlers on event observers are not executed during restoration.
 label = sec:replication
 
 ::figure{label=fig:replication:distributed-signals}
-  :image{/Figures/Graphs/4-devices-distributed-dataflow-graph.pdf}
-  Full :{flowgraph} of a distributed application (left) and abstract dataflow (right).
+	:image{/Figures/Graphs/4-devices-distributed-dataflow-graph.pdf}
+	Full :{flowgraph} of a distributed application (left) and abstract dataflow (right).
 ::
 
 This section presents how :{rescala} keeps the application responsive when network connections are not reliable and still ensures that the state of different replicas of the same application remains consistent.
@@ -263,7 +263,7 @@ When the derived reactive is only connected over device boundaries, this is call
 Distributed glitches always require at least two network connections: either a cycle as in the example or a diamond shape with at least three devices.
 To prohibit distributed glitches, Dev 1 would have to wait for the update on B to arrive,
 whenever A is changed.
-:{rescala} (as presented in this thesis) allows for distributed glitches in favor of availability (but :cite{style=name; DBLP:phd/dnb/Drechsler19} provides serializable distributed transactions for :{rescala} – losing availability).
+:{rescala} (as presented in this thesis) allows for distributed glitches in favor of availability (but :cite{DBLP:phd/dnb/Drechsler19; style=author} provides serializable distributed transactions for :{rescala} – losing availability).
 It is possible to analyze the :{flowgraph} and predict when a distributed glitch may occur, although it cannot be completely accurate with dynamic graphs and offline availability.
 In general, users usually appreciate when they are informed that their changes have not yet been confirmed by a remote connection and will understand that some changes or functionality thus is only applied later (e.g., a remote spell checker only highlighting mistakes after a couple of seconds).
 

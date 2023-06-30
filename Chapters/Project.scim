@@ -27,10 +27,10 @@ The rest of this chapter explains this design and extends the concepts of the fo
 # :{rescala}’s Internal Design
 
 ::figure{label=fig:rescala-core-packages}
-  :image{/Figures/System/project-structure.pdf}
+	:image{/Figures/System/project-structure.pdf}
 
-  Relationship between :{rescala}’s packages.
-  Core in :ref{Figure; fig-project-core-resources_derived_struct}, operators in :ref{Figure; fig-project-custom_derived_reactive}, and scheduler in :ref{Figure; fig-project-scheduler-formal_propagation}.
+	Relationship between :{rescala}’s packages.
+	Core in :ref{Figure; fig-project-core-resources_derived_struct}, operators in :ref{Figure; fig-project-custom_derived_reactive}, and scheduler in :ref{Figure; fig-project-scheduler-formal_propagation}.
 ::
 
 :{rescala} is split into three main packages, the core, the operators, and the schedulers.
@@ -65,25 +65,25 @@ In the following sections, we look at the core, the operators, and schedulers of
 
 
 ::figure{label=fig-project-core-resources_derived_struct}
-  ``{label=listing-resource_derived-struct}
-    trait Struct { :§Struct§
-      type State[V, S <: Struct] :§type-function§
-      def canNotBeImplemented[A]: A :§enforce-compiletime§
-    }
+	```code{lang=scala; label=listing-resource_derived-struct}
+		trait Struct { :§Struct§
+		  type State[V, S <: Struct] :§type-function§
+		  def canNotBeImplemented[A]: A :§enforce-compiletime§
+		}
 
-    trait ReSource[S <: Struct] { :§resource§
-      type Value
-      final type State = S#State[Value, S]
-      def state: State :§state§
-      def name: ReName :§name§
-      def commit(base: Value): Value :§commit§
-    }
+		trait ReSource[S <: Struct] { :§resource§
+		  type Value
+		  final type State = S#State[Value, S]
+		  def state: State :§state§
+		  def name: ReName :§name§
+		  def commit(base: Value): Value :§commit§
+		}
 
-    trait Derived[S <: Struct] extends ReSource[S] { :§derived§
-      def reevaluate(ticket: ReevTicket[Value, S]): Result[Value, S]  :§reevaluate§
-    }
-  ``
-  Basic abstractions used in the core of :{rescala} to interface between its operators and schedulers.
+		trait Derived[S <: Struct] extends ReSource[S] { :§derived§
+		  def reevaluate(ticket: ReevTicket[Value, S]): Result[Value, S]  :§reevaluate§
+		}
+	```
+	Basic abstractions used in the core of :{rescala} to interface between its operators and schedulers.
 ::
 
 # The Core
@@ -112,20 +112,20 @@ It is of note, that the structure trait is a purely compile time construct, it n
 
 
 ::figure{label=fig-project-core-result_trait}
-  ``{label=listing-project-coreresult_trait}
-    trait Result[T, S <: Struct] {
-      def activate: Boolean
-      def forValue(f: T => Unit): Unit
-      def forEffect(f: Observation => Unit): Unit
-      def inputs(): Option[Set[ReSource[S]]]
-    }
+	```code{lang=scala; label=listing-project-coreresult_trait}
+		trait Result[T, S <: Struct] {
+		  def activate: Boolean
+		  def forValue(f: T => Unit): Unit
+		  def forEffect(f: Observation => Unit): Unit
+		  def inputs(): Option[Set[ReSource[S]]]
+		}
 
-    class StaticTicket[S <: Struct](creation: Initializer[S]) extends InnerTicket(creation) {
-      def collectStatic(reactive: ReSource[S]): reactive.Value
-      def dependStatic[A](reactive: Interp[A, S]): A = reactive.interpret(collectStatic(reactive)) :§interpretation§
-    }
-  ``
-  Result trait communicating all the information we have already seen in :{fr} between the scheduler and operator of :{rescala} and the ticket implementation used for reactives that allow dynamic access.
+		class StaticTicket[S <: Struct](creation: Initializer[S]) extends InnerTicket(creation) {
+		  def collectStatic(reactive: ReSource[S]): reactive.Value
+		  def dependStatic[A](reactive: Interp[A, S]): A = reactive.interpret(collectStatic(reactive)) :§interpretation§
+		}
+	```
+	Result trait communicating all the information we have already seen in :{fr} between the scheduler and operator of :{rescala} and the ticket implementation used for reactives that allow dynamic access.
 ::
 
 ### Note on Scala 3
@@ -191,36 +191,36 @@ Thus, new implementations of operators are also not limited to these categories,
 
 
 ::figure{label=fig-project-custom_derived_reactive}
-  ``{label=listing-custom_derived_reactive}
-    class CustomDerivedString( :§custom-operator§
-        initState: S#State[String, S], :§init-state§
-        inputSource: Interp[String, S] :§init-input§
-    ) extends Derived[S]
-        with Interp[String, S] {
-      type Value = String
-      def state: State               = initState
-      def name: ReName               = "I am a name"
-      def commit(base: Value): Value = base :§commit§
+	```code{lang=scala; label=listing-custom_derived_reactive}
+		class CustomDerivedString( :§custom-operator§
+		    initState: S#State[String, S], :§init-state§
+		    inputSource: Interp[String, S] :§init-input§
+		) extends Derived[S]
+		    with Interp[String, S] {
+		  type Value = String
+		  def state: State               = initState
+		  def name: ReName               = "I am a name"
+		  def commit(base: Value): Value = base :§commit§
 
-      def reevaluate(input: ReIn): Rout = { :§reevaluate§
-        val sourceVal = input.dependStatic(inputSource) :§acces§
-        input.withValue(sourceVal + " :D") :§return§
-      }
+		  def reevaluate(input: ReIn): Rout = { :§reevaluate§
+		    val sourceVal = input.dependStatic(inputSource) :§acces§
+		    input.withValue(sourceVal + " :D") :§return§
+		  }
 
-      def interpret(v: Value): String = v
-    }
+		  def interpret(v: Value): String = v
+		}
 
-    val customDerived: Interp[String, S] = :§instantiate§
-      Ticket.fromScheduler(scheduler) :§create-ticket§
-        .create(
-          Set(customSource), :§s-input§
-          "This is the initial value", :§s-value§
-          inite = false :§inite§
-        ) { createdState => :§provided-state§
-          new CustomDerivedString(createdState, customSource)
-        }
-  ``
-  Implementing a new type of operator for a derived reactive.
+		val customDerived: Interp[String, S] = :§instantiate§
+		  Ticket.fromScheduler(scheduler) :§create-ticket§
+		    .create(
+		      Set(customSource), :§s-input§
+		      "This is the initial value", :§s-value§
+		      inite = false :§inite§
+		    ) { createdState => :§provided-state§
+		      new CustomDerivedString(createdState, customSource)
+		    }
+	```
+	Implementing a new type of operator for a derived reactive.
 ::
 
 
@@ -250,39 +250,39 @@ Usually a returned reactive would have a more interesting type than :code{Interp
 
 
 ::figure{label=fig-project-custom_source_reactive}
-  ``{label=listing-custom_source_reactive}
-    class CustomSource[T](initState: S#State[T, S]) extends ReSource[S] with Interp[T, S] {
-      outer =>
+	```code{lang=scala; label=listing-custom_source_reactive}
+		class CustomSource[T](initState: S#State[T, S]) extends ReSource[S] with Interp[T, S] {
+		  outer =>
 
-      type Value = T
-      def state: State               = initState
-      def name: ReName               = "I am a source name"
-      def interpret(v: Value): T     = v
-      def commit(base: Value): Value = base
+		  type Value = T
+		  def state: State               = initState
+		  def name: ReName               = "I am a source name"
+		  def interpret(v: Value): T     = v
+		  def commit(base: Value): Value = base
 
-      def makeChange(newValue: T) = :§make-change§
-        new InitialChange[S] { :§initial-change§
-          val source = outer
-          def writeValue(base         : outer.Value, :§writeValue§
-                         writeCallback: outer.Value => Unit
-                        ): Boolean = {
-          if (base != newValue) { :§no-change-check§
-            writeCallback(newValue) :§write-callback§
-            true :§return-activation§
-          } else false
-        }
-      }
-    }
+		  def makeChange(newValue: T) = :§make-change§
+		    new InitialChange[S] { :§initial-change§
+		      val source = outer
+		      def writeValue(base         : outer.Value, :§writeValue§
+		                     writeCallback: outer.Value => Unit
+		                    ): Boolean = {
+		      if (base != newValue) { :§no-change-check§
+		        writeCallback(newValue) :§write-callback§
+		        true :§return-activation§
+		      } else false
+		    }
+		  }
+		}
 
-    val customSource: CustomSource[String] =
-      Ticket.fromScheduler(scheduler)
-        .createSource("Hi!") { createdState => :§s-create§
-          new CustomSource[String](createdState)
-        }
+		val customSource: CustomSource[String] =
+		  Ticket.fromScheduler(scheduler)
+		    .createSource("Hi!") { createdState => :§s-create§
+		      new CustomSource[String](createdState)
+		    }
 
-    transaction(customSource) { _.recordChange(customSource.makeChange("Hello!")) } :§transaction§
-  ``
-  Implementing a new type of operator for a source reactive.
+		transaction(customSource) { _.recordChange(customSource.makeChange("Hello!")) } :§transaction§
+	```
+	Implementing a new type of operator for a source reactive.
 ::
 
 ## Custom Derived Reactives
@@ -357,34 +357,34 @@ In this example, the state type is a :code{StoreValue[V, S]}, where :code{V} is 
 To mutable parts of :code{StoreValue} (:ref{Line; listing-project-calculuslike_struct; line=store-value}) are the current :code{value: V}, and a set of inputs :code{ReSource[S]}.
 
 ::figure{label=fig-project-calculuslike_struct}
-  ``{label=listing-project-calculuslike_struct}
-    trait FStruct extends Struct { :§fstruct§
-      override type State[V, S <: Struct] = StoreValue[V, S] :§state-function§
-    }
+	```code{lang=scala; label=listing-project-calculuslike_struct}
+		trait FStruct extends Struct { :§fstruct§
+		  override type State[V, S <: Struct] = StoreValue[V, S] :§state-function§
+		}
 
-    class StoreValue[V, S <: Struct](var value: V) { :§store-value§
-      var inputs: Set[ReSource[S]] = Set.empty
-    }
+		class StoreValue[V, S <: Struct](var value: V) { :§store-value§
+		  var inputs: Set[ReSource[S]] = Set.empty
+		}
 
-  ``
-  Example of the structure for reactives corresponding to the calculus in :ref{Chapter; chapter-formalization}.
+	```
+	Example of the structure for reactives corresponding to the calculus in :ref{Chapter; chapter-formalization}.
 ::
 
 
 ::figure{label=fig-project-scheduler-creation}
-  ``{label=label-project-scheduler-creation}
-    def create[V, T <: Derived[S]](incoming: Set[ReSource[S]],
-                                   initv: V,
-                                   inite: Boolean,
-                                   creationTicket: CreationTicket[S])
-                                  (instantiateReactive: S#State[V, S] => T): T = {
-      val state = makeDerivedStructState[V](initv) :§make-struct§
-      val reactive = instantiateReactive(state) :§pass-state§
-      ignite(reactive, incoming, inite) :§ignite§
-      reactive
-    }
-  ``
-  The schedulers part of creating a new reactive.
+	```code{lang=scala; label=label-project-scheduler-creation}
+		def create[V, T <: Derived[S]](incoming: Set[ReSource[S]],
+		                               initv: V,
+		                               inite: Boolean,
+		                               creationTicket: CreationTicket[S])
+		                              (instantiateReactive: S#State[V, S] => T): T = {
+		  val state = makeDerivedStructState[V](initv) :§make-struct§
+		  val reactive = instantiateReactive(state) :§pass-state§
+		  ignite(reactive, incoming, inite) :§ignite§
+		  reactive
+		}
+	```
+	The schedulers part of creating a new reactive.
 ::
 
 The :code{create} method of the current scheduler generates a state implementation for new instances of reactives.
@@ -402,36 +402,36 @@ However, our case studies show no clear evidence that mixing creation of reactiv
 
 
 ::figure{label=fig-project-scheduler-transaction_overview}
-  ``{label=listing-project-scheduler-transaction_overview}
-    def forceNewTransaction[R](initialWrites: Set[ReSource[S]], :§fnt§
-                               admissionPhase: AdmissionTicket[S] => R): R = {
-      val tx = makeTransaction(_currentInitializer.value) :§newtx§
+	```code{lang=scala; label=listing-project-scheduler-transaction_overview}
+		def forceNewTransaction[R](initialWrites: Set[ReSource[S]], :§fnt§
+		                           admissionPhase: AdmissionTicket[S] => R): R = {
+		  val tx = makeTransaction(_currentInitializer.value) :§newtx§
 
-      val result =
-        try {
-          tx.preparationPhase(initialWrites) :§preparation§
-          val result = withDynamicInitializer(tx) {
-            val admissionTicket = tx.makeAdmissionPhaseTicket(initialWrites)
-            val admissionResult = admissionPhase(admissionTicket) :§admission§
-            tx.initializationPhase(admissionTicket.initialChanges) :§initialization§
-            tx.propagationPhase() :§propagation§
-            if (admissionTicket.wrapUp != null) admissionTicket.wrapUp(tx.accessTicket()) :§wrapup§
-            admissionResult
-          }
-          tx.commitPhase() :§commit§
-          result
-        } catch {
-          case e: Throwable =>
-            tx.rollbackPhase() :§rollback§
-            throw e
-        } finally {
-          tx.releasePhase() :§release§
-        }
-      tx.observerPhase() :§observer§
-      result
-    }
-  ``
-  Phases of a transaction in :{rescala}’s default scheduler.
+		  val result =
+		    try {
+		      tx.preparationPhase(initialWrites) :§preparation§
+		      val result = withDynamicInitializer(tx) {
+		        val admissionTicket = tx.makeAdmissionPhaseTicket(initialWrites)
+		        val admissionResult = admissionPhase(admissionTicket) :§admission§
+		        tx.initializationPhase(admissionTicket.initialChanges) :§initialization§
+		        tx.propagationPhase() :§propagation§
+		        if (admissionTicket.wrapUp != null) admissionTicket.wrapUp(tx.accessTicket()) :§wrapup§
+		        admissionResult
+		      }
+		      tx.commitPhase() :§commit§
+		      result
+		    } catch {
+		      case e: Throwable =>
+		        tx.rollbackPhase() :§rollback§
+		        throw e
+		    } finally {
+		      tx.releasePhase() :§release§
+		    }
+		  tx.observerPhase() :§observer§
+		  result
+		}
+	```
+	Phases of a transaction in :{rescala}’s default scheduler.
 ::
 
 ## Transactions
@@ -475,34 +475,34 @@ Each transaction of the default scheduler executes multiple phases in order.
   We only keep the current behavior for backwards compatibility with our case studies.
 
 ::figure{label=fig-project-scheduler-formal_propagation}
-  ``{label=listing-project-scheduler-formal_propagation}
-    def evaluate(
-        reactive: Derived[FStruct],
-        dynamicOk: ReSource[FStruct] => Boolean,
-        creationTicket: SimpleCreation
-    ): (Boolean, Boolean) = {
-      val dt = new ReevTicket[reactive.Value, FStruct](:§ticket§
-                     creationTicket, reactive.state.value) {...}
-      val reev = reactive.reevaluate(dt) :§reevaluate§
+	```code{lang=scala; label=listing-project-scheduler-formal_propagation}
+		def evaluate(
+		    reactive: Derived[FStruct],
+		    dynamicOk: ReSource[FStruct] => Boolean,
+		    creationTicket: SimpleCreation
+		): (Boolean, Boolean) = {
+		  val dt = new ReevTicket[reactive.Value, FStruct](:§ticket§
+		                 creationTicket, reactive.state.value) {...}
+		  val reev = reactive.reevaluate(dt) :§reevaluate§
 
-      def finishReevaluation() = { :§write-results§
-        reev.forValue(reactive.state.value = _)
-        reev.forEffect(_.execute())
-        (true, reev.activate)
-      }
+		  def finishReevaluation() = { :§write-results§
+		    reev.forValue(reactive.state.value = _)
+		    reev.forEffect(_.execute())
+		    (true, reev.activate)
+		  }
 
-      reev.inputs() match {
-        case None => // static reactive
-          finishReevaluation()
-        case Some(inputs) => //dynamic reactive :§dynamic§
-          reactive.state.inputs = inputs
-          if (dynamicOk(reactive)) finishReevaluation()
-          else (false, reev.activate)
+		  reev.inputs() match {
+		    case None => // static reactive
+		      finishReevaluation()
+		    case Some(inputs) => //dynamic reactive :§dynamic§
+		      reactive.state.inputs = inputs
+		      if (dynamicOk(reactive)) finishReevaluation()
+		      else (false, reev.activate)
 
-      }
-    }
-  ``
-  Reevaluation handling in the scheduler for :code{FStruct}.
+		  }
+		}
+	```
+	Reevaluation handling in the scheduler for :code{FStruct}.
 ::
 
 ## Reevaluation
@@ -544,45 +544,45 @@ In the current version, ParRP uses the :cite{priority queue; Maier2012} for prop
 After locking is done the propagation algorithm can run unmodified, except that ParRP must be notified when new dataflow edges are added.
 
 ::figure{label=fig-project-parrp_struct}
-  ``{label=listing-project-parrp_struct}
-    trait ParRPStruct extends Struct { :§struct§
-      type State[P, S <: Struct] = ParRPState[P, S]
-    }
+	```code{lang=scala; label=listing-project-parrp_struct}
+		trait ParRPStruct extends Struct { :§struct§
+		  type State[P, S <: Struct] = ParRPState[P, S]
+		}
 
-    class ParRPState[V, S <: Struct]( :§state§
-        var current: V, :§current§
-        val lock: ReLock[ParRPInterTurn])
-      extends Committable[V] {
+		class ParRPState[V, S <: Struct]( :§state§
+		    var current: V, :§current§
+		    val lock: ReLock[ParRPInterTurn])
+		  extends Committable[V] {
 
-      var owner: Token = null :§owner§
-      var update: V    = _ :§update§
+		  var owner: Token = null :§owner§
+		  var update: V    = _ :§update§
 
-      def write(value: V, token: Token): Boolean = {
-        assert(owner == null || owner == token, s"buffer owned by $owner written by $token")
-        update = value
-        val res = owner == null
-        owner = token
-        res
-      }
-      def base(token: Token): V = current
-      def get(token: Token): V = { if (token eq owner) update else current }
+		  def write(value: V, token: Token): Boolean = {
+		    assert(owner == null || owner == token, s"buffer owned by $owner written by $token")
+		    update = value
+		    val res = owner == null
+		    owner = token
+		    res
+		  }
+		  def base(token: Token): V = current
+		  def get(token: Token): V = { if (token eq owner) update else current }
 
-      def commit(r: V => V): Unit = {
-        current = r(update)
-        release()
-      }
-      def release(): Unit = {
-        update = null.asInstanceOf[V]
-        owner = null
-      }
+		  def commit(r: V => V): Unit = {
+		    current = r(update)
+		    release()
+		  }
+		  def release(): Unit = {
+		    update = null.asInstanceOf[V]
+		    owner = null
+		  }
 
-      /* incoming and outgoing changes (some helpers not shown) */
-      var incoming: Set[ReSource[S]]                   = Set.empty :§incoming§
-      var outgoing: mutable.Map[Derived[S], None.type] = mutable.HashMap.empty :§outgoing§
-    }
+		  /* incoming and outgoing changes (some helpers not shown) */
+		  var incoming: Set[ReSource[S]]                   = Set.empty :§incoming§
+		  var outgoing: mutable.Map[Derived[S], None.type] = mutable.HashMap.empty :§outgoing§
+		}
 
-  ``
-  The structure for reactives when using ParRP.
+	```
+	The structure for reactives when using ParRP.
 ::
 
 :ref{Figure; fig-project-parrp_struct} shows the structure for ParRP reactives.
@@ -630,19 +630,19 @@ We will look at that type class, how CRDTs are used by developers, and at the ne
 However, note that CRDTs in :{rescala} are still ongoing research, so the details are likely to change.
 
 ::figure{label=fig-project-lattice_interface}
-  ``
-    trait Lattice[A] {
-      /** By assumption: associative, commutative, idempotent. */
-      def merge(left: A, right: A): A
-    }
+	```
+		trait Lattice[A] {
+		  /** By assumption: associative, commutative, idempotent. */
+		  def merge(left: A, right: A): A
+		}
 
-    // Lattice instance for Set[A]
-    implicit def setInstance[A]: Lattice[Set[A]] =
-      new Lattice[Set[A]] {
-        override def merge(left: Set[A], right: Set[A]): Set[A] = left.union(right)
-      }
-  ``
-  Lattice API used by :{rescala} and its network runtime, and the implementation of Lattice for Scala Set.
+		// Lattice instance for Set[A]
+		implicit def setInstance[A]: Lattice[Set[A]] =
+		  new Lattice[Set[A]] {
+		    override def merge(left: Set[A], right: Set[A]): Set[A] = left.union(right)
+		  }
+	```
+	Lattice API used by :{rescala} and its network runtime, and the implementation of Lattice for Scala Set.
 ::
 
 ## Lattices
@@ -672,15 +672,15 @@ This simplifies distributed programming, because once an application works corre
 
 
 ::figure{label=fig-project-network_distribute}
-  ``
-    def replicate[A: Lattice, S <: Struct: Scheduler](
-        signal: Signal[A, S],
-        registry: Registry)
-       (binding: Binding[A => Unit]{
-          type RemoteCall = A => Future[Unit] })
-       : Unit
-  ``
-  Method of the network runtime to replicate signals.
+	```
+		def replicate[A: Lattice, S <: Struct: Scheduler](
+		    signal: Signal[A, S],
+		    registry: Registry)
+		   (binding: Binding[A => Unit]{
+		      type RemoteCall = A => Future[Unit] })
+		   : Unit
+	```
+	Method of the network runtime to replicate signals.
 ::
 
 ## Network Runtime

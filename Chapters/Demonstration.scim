@@ -14,8 +14,8 @@ Readers familiar with the general syntax of :{rescala} may want to skip to :ref{
 
 
 ::figure{label=fig-demonstration-rescala_system_model}
-  :image{/Figures/System/REScala Integration.pdf}
-  Integration of :{rescala} and the host language.
+	:image{/Figures/System/REScala Integration.pdf}
+	Integration of :{rescala} and the host language.
 ::
 
 We do not consider :{cvtr} as a replacement for existing programming paradigms that are better suited for implementing algorithms, modeling the domain data, and organizing the application into modules.
@@ -70,28 +70,28 @@ For example, the signal API generally produces reactives that combine the value 
 
 
 ::figure{label=fig:overview:full-code-formalism-chat-example}
-  ``{label=line:overview:full-code:}
-    val name: Var[String] = Var("")
-    val text: Evt[String] = Evt()
-    val message: Event[String] = text.map{ l => name.value + ": " + l)}
-    type Room = List[String]
-    val room1: Signal[Room] =
-          message.fold(List.empty){ (history, msg) => msg :: history}
-    val room2: Signal[Room] = Var(List("Me: a constant message"))
-    val roomList: Signal[List[Room]] = Var(List(room1, room2))
-    val index: Var[Int] = Var(0)
-    val selectedRoom: Signal[Signal[Room]] =
-          Signal { roomList.value(index.value) }
-    val roomContent: Signal[Room] = selectedRoom.flatten
-    val contentWidget: Signal[Widget] = roomContent.map(makeListWidget)  :§dataflow-evaluation-stop§
-    displayUI(name, text, contentWidget)
-  ``
-  Complete chat example code for a single device.
+	```code{lang=scala; label=line:overview:full-code:}
+		val name: Var[String] = Var("")
+		val text: Evt[String] = Evt()
+		val message: Event[String] = text.map{ l => name.value + ": " + l)}
+		type Room = List[String]
+		val room1: Signal[Room] =
+		      message.fold(List.empty){ (history, msg) => msg :: history}
+		val room2: Signal[Room] = Var(List("Me: a constant message"))
+		val roomList: Signal[List[Room]] = Var(List(room1, room2))
+		val index: Var[Int] = Var(0)
+		val selectedRoom: Signal[Signal[Room]] =
+		      Signal { roomList.value(index.value) }
+		val roomContent: Signal[Room] = selectedRoom.flatten
+		val contentWidget: Signal[Widget] = roomContent.map(makeListWidget)  :§dataflow-evaluation-stop§
+		displayUI(name, text, contentWidget)
+	```
+	Complete chat example code for a single device.
 ::
 
 ::figure{label=fig:background:dataflow-example-chat}
-  :image{/Figures/Graphs/chatroom-dataflow-example.pdf}
-  The :{flowgraph} of the chat example.
+	:image{/Figures/Graphs/chatroom-dataflow-example.pdf}
+	The :{flowgraph} of the chat example.
 ::
 
 # The Chat Example – :{rescala} Step by Step
@@ -105,11 +105,11 @@ Reactives with no incoming arrows are sources.
 The dashed lines represent dynamic edges, and dashed lines with diamonds represent nesting of reactives in other reactives.
 In the following, we will incrementally introduce and discuss the application code that builds that graph – starting with the following snippet.
 
-``{label=example-chat-inline-sources}
-  val name = Var("Alice")
-  val text = Evt[String]()
-  val message = text.map{ txt => name.value + ": " + txt) } :§derive§
-``
+```code{lang=scala; label=example-chat-inline-sources}
+	val name = Var("Alice")
+	val text = Evt[String]()
+	val message = text.map{ txt => name.value + ": " + txt) } :§derive§
+```
 
 The code snippet creates a source signal (:code{Var}) that represents the name of the current user, and a source event (:code{Evt}) whose occurrences represent chat messages.
 A :code{Var} is subtype of a signal and supports the full signal API, but in addition provides an API for imperative code to set the value of the signal, thus providing an integration with imperative Scala code.
@@ -163,11 +163,11 @@ When a transaction changes any reactive, then the derived reactive changes accor
 A fold, such as in :ref{Line; example-chat-inline-folds; line=fold-example}, creates a signal with an initial value and updates it according to the parameter function every time the event occurs.
 
 
-``{label=example-chat-inline-folds}
-  type Room = List[String]
-  val room1: Signal[Room] =
-        message.fold(List.empty){ (history, msg) => msg :: history} :§fold-example§
-``
+```code{lang=scala; label=example-chat-inline-folds}
+	type Room = List[String]
+	val room1: Signal[Room] =
+	      message.fold(List.empty){ (history, msg) => msg :: history} :§fold-example§
+```
 
 We represent chat rooms as their history of messages – implemented as a list with the newest message at its head.
 The :code{room1} fold signal accumulates all messages into the history using :code{::} to add an element to the head of the chat history.
@@ -184,11 +184,11 @@ Thus, the only way to combine multiple signals is to apply a function to the val
 The result of the function is the value of the derived signal.
 In our chat example we use an index to select one of multiple chat rooms to be then displayed to the user.
 
-``{label=example-chat-inline-signal_expressions}
-  val roomList = Var(List(room1, room2)) // list of two rooms :§list-of-rooms§
-  val index = Var(0)
-  val selectedRoom = Signal { roomList.value(index.value) } :§derive-from-room-list§
-``
+```code{lang=scala; label=example-chat-inline-signal_expressions}
+	val roomList = Var(List(room1, room2)) // list of two rooms :§list-of-rooms§
+	val index = Var(0)
+	val selectedRoom = Signal { roomList.value(index.value) } :§derive-from-room-list§
+```
 
 The :code{selectedRoom} uses a signal expression to select the one at the position denoted by :code{index} (:ref{Line; example-chat-inline-signal_expressions; line=derive-from-room-list}).
 Signal expressions are blocks of Scala code, but inside the block the :code{.value} method of input signals is available, similar to the :code{.map} method of events.
@@ -211,9 +211,9 @@ Both rooms in :ref{Line; example-chat-inline-signal_expressions; line=list-of-ro
 Nested reactives on their own are not special, they are values flowing through the :{flowgraph}.
 The value of directly nested signals is accessed using the :code{.flatten} method.
 
-``{label=example-chat-inline-flatten}
-  val roomContent = selectedRoom.flatten :§flatten-room-list§
-``
+```code{lang=scala; label=example-chat-inline-flatten}
+	val roomContent = selectedRoom.flatten :§flatten-room-list§
+```
 
 When a nested signal is flattened, then a dynamically changing dependency is created.
 In this example, :code{roomContent} depends on either :code{room1} or :code{room2}.
@@ -221,19 +221,19 @@ In :ref{Figure; fig:background:dataflow-example-chat} the dynamic edge is shown 
 The :code{roomContent} signal has two inputs, the first is always the :code{selectedRoom} signal, the second is the dynamic one and defined by the first input.
 Signal expressions also support dynamic edges and the flatten operation could be rewritten using a double unwrapping of signals.
 
-``{label=example-chat-inline-flatten-expression}
-  val roomContent = Signal { selectedRoom.value.value }
-``
+```code{lang=scala; label=example-chat-inline-flatten-expression}
+	val roomContent = Signal { selectedRoom.value.value }
+```
 
 Accessing nested signals using signal expressions produces a dynamic :{flowgraph} in the same way as flatten does, but using signal expressions enables directly selecting nested signals inside some other data structure or event multiple levels of nested signals.
 However, it is always possible to rewrite signal expressions with dynamic access instead use only static access and (multiple) flatten reactives.
 For example, assume we have a a function :code{f} that dynamically computes a reactive based on the value of reactive :code{r} and we want to pass the value of the dynamic reactive to a function :code{g}.
 Then the two lines below compute the same result.
 
-``
-  Signal { g(f(r.value).value) }
-  r.map(f).flatten.map(g)
-``
+```
+	Signal { g(f(r.value).value) }
+	r.map(f).flatten.map(g)
+```
 
 Thus, we limit our later formal analysis to flatten reactives without loss of functionality.
 
@@ -246,9 +246,9 @@ Observers execute a callback function every time the observed signal changes its
 The callback function is applied to the current value of the reactive.
 For example, to print the whole chat history to the console every time a new chat message is sent we use the :code{println} function as an observer.
 
-``{label=example-chat-inline-observer}
-  roomContent.observe(println)
-``
+```code{lang=scala; label=example-chat-inline-observer}
+	roomContent.observe(println)
+```
 
 Observers are an API meant to integrate with existing imperative APIs of UI libraries.
 The completed example in :ref{Figure; fig:overview:full-code-formalism-chat-example} uses such an integration with a UI library instead of directly using observers.
@@ -300,40 +300,40 @@ However in practice this issue is rare, because the Scala language does not allo
 label = sec-shared_calendar-example
 
 ::figure{label=fig-shared_calendar-code}
-  ``{label=line-background-shared_calendar-code}
-    case class Entry(title: Signal[String], date: Signal[Date])  :§entry-case-class§
+	```code{lang=scala; label=line-background-shared_calendar-code}
+		case class Entry(title: Signal[String], date: Signal[Date])  :§entry-case-class§
 
-    val newEntry: Event[Entry] = App.newEntryUI() :§input-evt§
-    val automaticEntries: Event[Entry] = App.nationalHolidays() :§from-network§
-    val allEntries = newEntry || automaticEntries  :§orOperator§
+		val newEntry: Event[Entry] = App.newEntryUI() :§input-evt§
+		val automaticEntries: Event[Entry] = App.nationalHolidays() :§from-network§
+		val allEntries = newEntry || automaticEntries  :§orOperator§
 
-    val selectedDay: Signal[Date] = :§selected-day-from-ui§
-      Storage.persist(id = "day", default = Date.today){
-        init => App.selectedDayUI(init) } :§selected-day-from-ui-end§
-    val selectedWeek = Signal { Week.of(selectedDay.value) }  :§derived-signal-example§
+		val selectedDay: Signal[Date] = :§selected-day-from-ui§
+		  Storage.persist(id = "day", default = Date.today){
+		    init => App.selectedDayUI(init) } :§selected-day-from-ui-end§
+		val selectedWeek = Signal { Week.of(selectedDay.value) }  :§derived-signal-example§
 
-    val entrySet: Signal[ReplicatedSet[Entry]] =  :§start:fold-example§
-      Storage.persist("entryset", default = ReplicatedSet.empty){:§replicated-set§
-        init => allEntries.fold(init) {
-          (state, entry) => state.add(entry) } } :§end:fold-example§
+		val entrySet: Signal[ReplicatedSet[Entry]] =  :§start:fold-example§
+		  Storage.persist("entryset", default = ReplicatedSet.empty){:§replicated-set§
+		    init => allEntries.fold(init) {
+		      (state, entry) => state.add(entry) } } :§end:fold-example§
 
-    Network.replicate(id = "entryset", reactive = entrySet) :§distribute§
+		Network.replicate(id = "entryset", reactive = entrySet) :§distribute§
 
-    val selectedEntries = Signal {  :§selected-entries-signal-expression§
-      entrySet.value.toSet.filter { entry =>  :§selected-entries-filter-entrySet§
-        selectedWeek.value == Week.of(entry.date.value)   :§signal-expression-apply§
-      }
-    } :§selected-entries-signal-expression-end§
+		val selectedEntries = Signal {  :§selected-entries-signal-expression§
+		  entrySet.value.toSet.filter { entry =>  :§selected-entries-filter-entrySet§
+		    selectedWeek.value == Week.of(entry.date.value)   :§signal-expression-apply§
+		  }
+		} :§selected-entries-signal-expression-end§
 
-    selectedEntries.observe(Ui.displayEntryList)  :§observer-signal§
-  ``
+		selectedEntries.observe(Ui.displayEntryList)  :§observer-signal§
+	```
 
-  Excerpt of :{rescala} source code for the shared calendar application.
+	Excerpt of :{rescala} source code for the shared calendar application.
 ::
 
 ::figure{label=fig:background:reactive-graph}
-  :image{/Figures/Graphs/shared-calendar-example.pdf}
-  The :{flowgraph} for the calendar application.
+	:image{/Figures/Graphs/shared-calendar-example.pdf}
+	The :{flowgraph} for the calendar application.
 ::
 
 We discuss a second case study to show a more involved domain model for an interactive application, but also to show the syntax for snapshots and replication used in :{rescala}.

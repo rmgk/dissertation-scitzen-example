@@ -61,14 +61,14 @@ To synchronize the full state of the application between devices,
 we implement both the list of tasks and each individual task as a replicated reactive.
 
 ::figure{label=figure-case_studies-task_data}
-  ``{label=listing-case_studies-task_data}
-    val taskData =
-      Events.foldAll(LastWriterWins(initial))(current => Seq(:§definition§
-        doneEv >> { _ => current.map(_.toggle()) },:§done§
-        editStr >> { v => current.map(_.edit(v)) }:§edit§
-      ))(uniqueId)
-  ``
-  Implementation of the list of tasks.
+	```code{lang=scala; label=listing-case_studies-task_data}
+		val taskData =
+		  Events.foldAll(LastWriterWins(initial))(current => Seq(:§definition§
+		    doneEv >> { _ => current.map(_.toggle()) },:§done§
+		    editStr >> { v => current.map(_.edit(v)) }:§edit§
+		  ))(uniqueId)
+	```
+	Implementation of the list of tasks.
 ::
 
 Each task has its own “done” button and “edit” input box.
@@ -82,19 +82,19 @@ The UI representing a single task is then derived from this task signal.
 
 
 ::figure{label=figure-case_studies-list_of_tasks}
-  ``{label=listing-case_studies-list_of_tasks}
-    val tasksRGA: Signal[RGA[Taskref]] = :§definition§
-      Events.foldAll(RGA(initialTasks)) { tasks => Seq(
-        createTask >> {tasks.prepend}, :§creating§
-        removeAll.event >>> { dt => _ => :§remove_done§
-          tasks.filter(t => !dt.depend(t.contents).done)
-        },
-        tasks.value.map(_.removeClick) >> { :§remove_single§
-          t => tasks.filter(_.id != t)
-        }
-      )}(implicitly, "tasklist")
-  ``
-  Implementation of the list of tasks.
+	```code{lang=scala; label=listing-case_studies-list_of_tasks}
+		val tasksRGA: Signal[RGA[Taskref]] = :§definition§
+		  Events.foldAll(RGA(initialTasks)) { tasks => Seq(
+		    createTask >> {tasks.prepend}, :§creating§
+		    removeAll.event >>> { dt => _ => :§remove_done§
+		      tasks.filter(t => !dt.depend(t.contents).done)
+		    },
+		    tasks.value.map(_.removeClick) >> { :§remove_single§
+		      t => tasks.filter(_.id != t)
+		    }
+		  )}(implicitly, "tasklist")
+	```
+	Implementation of the list of tasks.
 ::
 
 The list of tasks is a single replicated fold that reacts to adding tasks, removing tasks, and clearing all tasks.
@@ -107,18 +107,18 @@ We want to stress that in the :{cvtr} paradigm the definition of all reactives a
 
 
 ::figure{label=figure-case_studies-taskcodec}
-  ``{label=listing-case_studies-taskcodec}
-    implicit val taskDecoder: Decoder[Taskref] = :§decoder§
-      Decoder.decodeTuple2[String, TaskData].map { case (s, td) => maketask(td, s) } :§maketask§
-    implicit val taskEncoder: Encoder[Taskref] = :§encoder§
-      Encoder.encodeTuple2[String, TaskData].contramap[Taskref](tr => (tr.id, tr.initial))
-  ``
-  Encoder and decoder implementation for Tasks using Circe.
+	```code{lang=scala; label=listing-case_studies-taskcodec}
+		implicit val taskDecoder: Decoder[Taskref] = :§decoder§
+		  Decoder.decodeTuple2[String, TaskData].map { case (s, td) => maketask(td, s) } :§maketask§
+		implicit val taskEncoder: Encoder[Taskref] = :§encoder§
+		  Encoder.encodeTuple2[String, TaskData].contramap[Taskref](tr => (tr.id, tr.initial))
+	```
+	Encoder and decoder implementation for Tasks using Circe.
 ::
 
 In addition to :{rescala} this case study requires some other major components.
 The UI implementation is based on :cite{ScalaTags; ScalaTags} for which :{rescala} provides an integration library.
-The network transport layer is based on the work of :cite{style=name; Weisenburger:2018:DSD}.
+The network transport layer is based on the work of :cite{Weisenburger:2018:DSD; style=author}.
 In general, the desired type of network communication varies greatly between applications,
 from a web application using JSON messages over WebSockets to a server exchanging binary data on a TCP socket.
 Thus, :{rescala} is independent of the implementation details of the concrete networking used.
@@ -225,32 +225,32 @@ While we cannot fully control the network conditions for the Twilio implementati
 
 
 ::figure{label=fig:evaluation:computation-network-results}
-  ``{converter=tex; template=/templates/formalism.scim}
-    \begin{document}
-    \begin{figure}
-    \centering
-    %trim={<left> <lower> <right> <upper>}
-    %\setlength{\fboxsep}{0pt}
-    %\fbox{
-    \includegraphics[width=.49\textwidth,trim={30mm 184mm 30mm 100mm},clip]{../../../Figures//formalism/computation}
-    %}
-    \begin{minipage}{.5\textwidth}
-      \centering
-    %  \fbox{
-      \includegraphics[width=.98\textwidth,trim={25mm 105mm 30.5mm 113mm},clip]{../../../Figures//formalism/computation}
-    %  }
+	```convert{template={/templates/formalism.scim}; tex={}}
+		\begin{document}
+		\begin{figure}
+		\centering
+		%trim={<left> <lower> <right> <upper>}
+		%\setlength{\fboxsep}{0pt}
+		%\fbox{
+		\includegraphics[width=.49\textwidth,trim={30mm 184mm 30mm 100mm},clip]{../../../Figures/formalism/computation}
+		%}
+		\begin{minipage}{.5\textwidth}
+		  \centering
+		%  \fbox{
+		  \includegraphics[width=.98\textwidth,trim={25mm 105mm 30.5mm 113mm},clip]{../../../Figures/formalism/computation}
+		%  }
 
-    \end{minipage}%
-    \begin{minipage}{.5\textwidth}
-      \centering
-    %  \fbox{
-      \includegraphics[width=.98\textwidth,trim={25mm 105mm 30.5mm 113mm},clip]{../../../Figures//formalism/network}
-    %  }
-    \end{minipage}
-    \end{figure}
-    \end{document}
-  ``
-  Time spent on computation (left) and network (right) when adding a new task.
+		\end{minipage}%
+		\begin{minipage}{.5\textwidth}
+		  \centering
+		%  \fbox{
+		  \includegraphics[width=.98\textwidth,trim={25mm 105mm 30.5mm 113mm},clip]{../../../Figures/formalism/network}
+		%  }
+		\end{minipage}
+		\end{figure}
+		\end{document}
+	```
+	Time spent on computation (left) and network (right) when adding a new task.
 ::
 
 
@@ -432,10 +432,10 @@ The application code can also be acquired directly from the smart street light.
 Technical advanced users are able to share the application directly from device to device using any ad-hoc communication channel still available during the emergency.
 
 ::figure{label=fig:application:communication-diagram}
-  ``{converter=tex; template=/templates/tikz.scim; maxwidth=0.8}
-    \input{../../../Figures//Studies/app.pdf_tex}
-  ``
-  Communication in our network runtime.
+	```convert{template={/templates/tikz.scim; maxwidth=0.8}; tex={}}
+		\input{../../../Figures/Studies/app.pdf_tex}
+	```
+	Communication in our network runtime.
 ::
 
 This case study uses a custom network runtime for communication.
@@ -445,7 +445,7 @@ Thus, it is easy to customize the network runtime to specific use cases, because
 
 Figure:ref{; fig:application:communication-diagram} shows an example message flow of the deployed application.
 First, communication happens via a central server where the city sends messages to the street light that are forwarded to the citizen application.
-When an emergency occurs and messages form the city no longer reach the street light, then citizen devices start communicating directly with each other.
+When an emergency occurs and messages from the city no longer reach the street light, then citizen devices start communicating directly with each other.
 
 We limit potential abuse for communication by only automatically forwarding messages from known participants, such as first responders.
 These known participants are determined by pre-shared public keys acquired during everyday operations.
@@ -458,9 +458,9 @@ However, we only assume emergencies to last for a short time, a couple of days a
 ## Evaluation of Network Overhead
 
 ::figure{label=fig:evaluation:application}
-  :image{maxwidth=0.7; /Figures/Studies/app-empirical-fixed.pdf}
+	:image{maxwidth=0.7; /Figures/Studies/app-empirical-fixed.pdf}
 
-  Round trip times and message sizes for increasingly more messages.
+	Round trip times and message sizes for increasingly more messages.
 ::
 
 We evaluate our citizen application with respect to message sizes and message delays in Figure:ref{; fig:evaluation:application}.
@@ -506,8 +506,10 @@ The case studies are listed in Figure :ref{table:evaluation:counted-occurences} 
 
 
 ::figure{label=table:evaluation:counted-occurences}
-  :image{converter=tex; template=/templates/formalism.scim; /Figures/faults/evaluation-table.tex}
-  Possibly problematic operators in case studies and extensions.
+	```convert{load={/Figures/faults/evaluation-table.tex}; template={/templates/formalism.scim}; tex={}}
+
+	```
+	Possibly problematic operators in case studies and extensions.
 ::
 
 
@@ -544,11 +546,11 @@ For example, the Pong game initializes the UI elements,
 and adds them one by one to a list of all UI elements, as shown below.
 As a result, this list would grow after each restoration.
 
-``
-  val addElement = Evt[UIElement]
-  val allUIelements: Signal[List[UIElement]] = addElement.list()
-  addElement.fire(ball); addElement.fire(player1); ...
-``
+```
+	val addElement = Evt[UIElement]
+	val allUIelements: Signal[List[UIElement]] = addElement.list()
+	addElement.fire(ball); addElement.fire(player1); ...
+```
 
 Firing of events must not be misused for
 initializing reactives.
@@ -602,11 +604,11 @@ However, with eventually consistent propagation :code{second} could
 change from 59 to 2 skipping the intermediate step, because an aggregated update is received over the network,
 resulting in a missed minute.
 
-``
-  val tick: Event[Unit] = ... // fires once per second
-  val second = Signal { tick.count() % 60 }
-  val minute = Signal { seconds.change.filter(_ == 0).count() % 60 }
-``
+```
+	val tick: Event[Unit] = ... // fires once per second
+	val second = Signal { tick.count() % 60 }
+	val minute = Signal { seconds.change.filter(_ == 0).count() % 60 }
+```
 
 
 
@@ -645,9 +647,9 @@ Especially important to us is that error propagation does not “pollute”
 application code and instead only requires changes directly necessary to improve the user experience.
 
 ::figure{label=fig:evaluation:pong-example-recover-graph}
-  :image{maxwidth=0.75; /Figures/Graphs/pong-example.pdf}
+	:image{maxwidth=0.75; /Figures/Graphs/pong-example.pdf}
 
-  Recovering from errors in Pong.
+	Recovering from errors in Pong.
 ::
 
 The case study consists of two application windows, one for each player.
@@ -660,9 +662,9 @@ To evaluate error handling in :{rescala}, we added functionality to allow player
 When a player disconnects, an error gets inserted into the position signal of the
 racket of that player:
 
-``
-  UI.onClose{ Racket.pos.admit(PlayerDisconnected)  }
-``
+```
+	UI.onClose{ Racket.pos.admit(PlayerDisconnected)  }
+```
 
 Following the dataflow of :code{Racket.pos} through the :{flowgraph} of the application,
 one can identify the places where the error needs to be handled.
@@ -674,19 +676,19 @@ we reused an existing try/catch block that handled missing game objects and
 added a handler for the :code{PlayerDisconnected} exception.
 Note that handling the disconnected event may require a different handler if the game should support different failure modes than just removing the player.
 
-``
-  case _: NoSuchElementException |  _ : PlayerDisconnected =>
-  // remaining handler unchanged
-``
+```
+	case _: NoSuchElementException |  _ : PlayerDisconnected =>
+	// remaining handler unchanged
+```
 
 As a final modification to the code, failed connections are observed and the corresponding player is removed from the game.
 To remove the player, a list of disconnected players is derived from the list of players, by filtering on the player connection:
 
 
-``
-  val disconnectedPlayers = Signal{ players.value.filter { p => Try(p.connection.value).isFailure} }
-  disconnectedPlayers.observe(Game.removePlayers)
-``
+```
+	val disconnectedPlayers = Signal{ players.value.filter { p => Try(p.connection.value).isFailure} }
+	disconnectedPlayers.observe(Game.removePlayers)
+```
 
 If accessing the connection raises an error (checked with :code{Try(...).isFailure}), then the player is considered disconnected.
 The resulting list of failed players is observed and these players are removed from the game (closing the connection and updating the list of players).

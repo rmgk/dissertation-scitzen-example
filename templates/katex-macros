@@ -45,8 +45,8 @@
 \evt:\operatorname{Source}(#1)
 \react:#1.\operatorname{Map}\{#2\}
 \flatten:#1.\operatorname{Flatten}
-\newcommand{\unit}{\operatorname{unit}}
-\newcommand{\error}{\operatorname{error}}
+\unit:\operatorname{unit}
+\error:\operatorname{error}
 \handle:\operatorname{try} #1 \operatorname{catch} #2
 \named:\ \ \text{(\textsc{#1})}\and
 \ror:(#1 || #2)

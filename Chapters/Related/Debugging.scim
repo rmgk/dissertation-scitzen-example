@@ -38,7 +38,7 @@ They have not considered modifications.
 There are some tools that support live modifications of applications:
 The :cite{Elm debugger; ElmDebugger} allows one to go back in the past,
 but modifications have to be done on the source code.
-:cite{Kato2016; style=name} have presented the idea of live tuning,
+:cite{Kato2016; style=author} have presented the idea of live tuning,
 where users are presented with a simplified interface
 – only the tuning sliders – of a full-fledged live programming IDE.
 We use this idea to provide live tuning based on an extended debugger instead of a full IDE.
